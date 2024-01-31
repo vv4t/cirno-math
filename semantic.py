@@ -19,12 +19,14 @@ def ast_stmt(scope, node):
     return [ast_print_stmt(scope, node)]
   elif isinstance(node, AstIfStmt):
     return [ast_if_stmt(scope, node)]
+  elif isinstance(node, AstWhileStmt):
+    return [ast_while_stmt(scope, node)]
   elif isinstance(node, AstStmt):
     if isinstance(node.body, AstVar):
       ast_var(scope, node.body)
       return []
     elif isinstance(node.body, AstExpr):
-      return [AstExpr(ast_expr(scope, node.body))]
+      return [AstStmt(AstExpr(ast_expr(scope, node.body)))]
   else:
     raise Exception("NOT DONE BAKA!!!")
 
@@ -39,6 +41,11 @@ def ast_compound_stmt(scope, node):
   return node
 
 def ast_if_stmt(scope, node):
+  node.cond = ast_expr(scope, node.cond)
+  node.body = ast_compound_stmt(scope, node.body)
+  return node
+
+def ast_while_stmt(scope, node):
   node.cond = ast_expr(scope, node.cond)
   node.body = ast_compound_stmt(scope, node.body)
   return node
@@ -91,15 +98,6 @@ def ast_identifier(scope, node):
 
 def ast_binop(scope, node):
   lhs = ast_expr(scope, node.lhs)
-  
-  if node.op.text == "=":
-    rhs = AstExpr(ast_expr(scope, node.rhs))
-    
-    if not var_type_cmp(lhs.var_type, rhs.var_type):
-      raise SemanticError(node, f"unsupported operand type(s) for '=': '{lhs.var_type}' and '{rhs.var_type}'")
-    
-    return AstAssign(lhs, rhs, lhs.var_type)
-  
   rhs = ast_expr(scope, node.rhs)
   
   if not var_type_cmp(lhs.var_type, rhs.var_type):

@@ -13,7 +13,8 @@ class VM:
       else:
         self.opc.append(line)
     
-    print(self.lbl)
+    for label, pos in self.lbl.items():
+      print(f'{label}: {pos}')
     
     for n, opc in zip(range(len(self.opc)), self.opc):
       print(n, opc)
@@ -45,7 +46,7 @@ class VM:
       elif args[0] == "div":
         b = self.stack.pop()
         a = self.stack.pop()
-        self.stack.append(a / b)
+        self.stack.append(a // b)
       elif args[0] == "jle":
         b = self.stack.pop()
         a = self.stack.pop()

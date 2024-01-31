@@ -61,15 +61,6 @@ class AstBinop:
   def __repr__(self):
     return f'{self.lhs} {self.op} {self.rhs}'
 
-class AstAssign:
-  def __init__(self, lvalue, value, var_type):
-    self.lvalue = lvalue
-    self.value = value
-    self.var_type = var_type
-  
-  def __repr__(self):
-    return f'{self.lvalue} = {self.value}'
-
 class AstExpr:
   def __init__(self, body, bracket=False, var_type=None):
     self.body = body
@@ -114,6 +105,14 @@ class AstIfStmt:
   
   def __repr__(self, pad=0):
     return ' ' * pad + f'if ({self.cond})\n{self.body.__repr__(pad=pad+2)};'
+
+class AstWhileStmt:
+  def __init__(self, cond, body):
+    self.cond = cond
+    self.body = body
+  
+  def __repr__(self, pad=0):
+    return ' ' * pad + f'while ({self.cond})\n{self.body.__repr__(pad=pad+2)};'
 
 class AstStmt:
   def __init__(self, body):

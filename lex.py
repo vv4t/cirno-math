@@ -88,7 +88,7 @@ class Lex:
   def match_identifier(self):
     match = re.search("^[a-zA-Z_][a-zA-Z0-9_]*", self.text)
     
-    keyword = [ "int", "if", "print" ]
+    keyword = [ "int", "if", "while", "print" ]
     
     if match:
       if match.group() in keyword:

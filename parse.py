@@ -1,5 +1,6 @@
 from ast import *
 from helper import find_match
+from lex import LexError
 
 def parse(lex):
   body = parse_body(lex)
@@ -26,7 +27,8 @@ def parse_body(lex):
 def parse_stmt(lex):
   body = find_match([
     parse_print_stmt(lex),
-    parse_if_stmt(lex)
+    parse_if_stmt(lex),
+    parse_while_stmt(lex)
   ])
   
   if body:
@@ -55,6 +57,18 @@ def parse_if_stmt(lex):
   body = parse_compound_stmt(lex)
   
   return AstIfStmt(cond, body)
+
+def parse_while_stmt(lex):
+  if not lex.accept("while"):
+    return None
+  
+  lex.expect("(")
+  cond = parse_expr(lex)
+  lex.expect(")")
+  
+  body = parse_compound_stmt(lex)
+  
+  return AstWhileStmt(cond, body)
 
 def parse_print_stmt(lex):
   token = lex.accept("print")
@@ -149,6 +163,9 @@ def parse_binop_level(lex, level):
     return lhs
   
   rhs = parse_binop_level(lex, level)
+  
+  if not rhs:
+    raise LexError(op, f"expected 'Expression' after '{op}' but found {lex.token.text}")
   
   return AstBinop(lhs, op, rhs)
 

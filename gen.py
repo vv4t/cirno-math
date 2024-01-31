@@ -23,8 +23,8 @@ class CodeGen:
       self.gen_print_stmt(node)
     elif isinstance(node, AstIfStmt):
       self.gen_if_stmt(node)
-    elif isinstance(node.body, AstAssign):
-      self.gen_assign(node.body)
+    elif isinstance(node, AstWhileStmt):
+      self.gen_while_stmt(node)
     elif isinstance(node, AstStmt):
       if isinstance(node.body, AstExpr):
         self.gen_expr(node.body)
@@ -33,10 +33,19 @@ class CodeGen:
   
   def gen_if_stmt(self, node):
     lbl_end = self.label()
-    lbl_else = self.label()
     
     self.gen_cmp_cond(node.cond, lbl_end)
     self.gen_compound_stmt(node.body)
+    self.emit_label(lbl_end)
+  
+  def gen_while_stmt(self, node):
+    lbl_cond = self.label()
+    lbl_end = self.label()
+    
+    self.emit_label(lbl_cond)
+    self.gen_cmp_cond(node.cond, lbl_end)
+    self.gen_compound_stmt(node.body)
+    self.emit(f'jmp {lbl_cond}')
     self.emit_label(lbl_end)
   
   def gen_print_stmt(self, node):
@@ -47,11 +56,6 @@ class CodeGen:
     for stmt in node.body:
       self.gen_stmt(stmt)
   
-  def gen_assign(self, node):
-    self.gen_lvalue(node.lvalue)
-    self.gen_expr(node.value)
-    self.emit('store')
-
   def gen_lvalue(self, node):
     if isinstance(node, AstIdentifier):
       loc = self.var[node.identifier]
@@ -98,7 +102,11 @@ class CodeGen:
       self.emit(f'jgt {lbl_else}')
   
   def gen_binop(self, node):
-    if node.op.text == ">" or node.op.text == "<" or node.op.text == ">=" or node.op.text == "<=":
+    if node.op.text == "=":
+      self.gen_lvalue(node.lhs)
+      self.gen_expr(node.rhs)
+      self.emit('store')
+    elif node.op.text == ">" or node.op.text == "<" or node.op.text == ">=" or node.op.text == "<=":
       lbl_end = self.label()
       lbl_else = self.label()
       
@@ -108,22 +116,20 @@ class CodeGen:
       self.emit_label(lbl_else)
       self.emit("push 0")
       self.emit_label(lbl_end)
-      
-      return
-    
-    self.gen_expr(node.lhs)
-    self.gen_expr(node.rhs)
-      
-    if node.op.text == "+":
-      self.emit("add")
-    elif node.op.text == "-":
-      self.emit("sub")
-    elif node.op.text == "*":
-      self.emit("mul")
-    elif node.op.text == "/":
-      self.emit("div")
     else:
-      raise Exception("I DONT KNOW THIS ONE!!!")
+      self.gen_expr(node.lhs)
+      self.gen_expr(node.rhs)
+      
+      if node.op.text == "+":
+        self.emit("add")
+      elif node.op.text == "-":
+        self.emit("sub")
+      elif node.op.text == "*":
+        self.emit("mul")
+      elif node.op.text == "/":
+        self.emit("div")
+      else:
+        raise Exception("I DONT KNOW THIS ONE!!!")
   
   def label(self):
     self.lbl_name += 1
