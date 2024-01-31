@@ -1,13 +1,18 @@
-from lex import Lex
+from vm import VM
+from lex import Lex, LexError
 from parse import parse
-from cirno_math import simplify
+from gen import CodeGen
+from semantic import semantic_pass, SemanticError
 
-import sys
-
-for line in sys.stdin:
-  lex = Lex(line.rstrip())
+try:
+  lex = Lex("main.9c")
   node = parse(lex)
+
+  node = semantic_pass(node)
+
+  code_gen = CodeGen(node)
   
-  node = simplify(node)
-  
-  print(node)
+  vm = VM(code_gen.code)
+  vm.run()
+except (LexError, SemanticError) as e:
+  print(e)
