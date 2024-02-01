@@ -5,13 +5,15 @@ class CodeGen:
   def __init__(self, node):
     self.code = []
     self.lbl_name = 0
+    self.lbl_main = 'label_main'
     self.scope = None
     self.gen_body(node.body)
   
   def var_alloc(self, scope, size):
     for var in scope.var.values():
-      var.loc = size
-      size += type_sizeof(var.var_type)
+      if isinstance(var, AstVar):
+        var.loc = size
+        size += type_sizeof(var.var_type)
     
     for child in scope.child:
       size += self.var_alloc(child, size)
@@ -19,17 +21,48 @@ class CodeGen:
     return size
   
   def gen_body(self, node):
-    self.scope = node.scope
+    for fn in node.scope.var.values():
+      if isinstance(fn, AstFunc):
+        self.gen_func(fn)
     
+    self.scope = node.scope
     size = self.var_alloc(self.scope, 0)
+    self.emit_label(self.lbl_main)
     self.emit(f'frame {size}')
     
     for stmt in node.body:
       self.gen_stmt(stmt)
   
+  def gen_func(self, fn):
+    size = self.var_alloc(fn.body.scope, 0)
+    
+    fn.label = self.label()
+    self.lbl_ret = self.label()
+    self.scope = fn.body.scope
+    
+    self.emit_label(fn.label)
+    self.emit(f'frame {size}')
+    
+    loc = 0
+    for param in reversed(fn.params):
+      self.emit(f'push {loc}')
+      self.emit("rx $fp")
+      self.emit("add")
+      self.emit("param")
+      self.emit("store")
+      loc += type_sizeof(param.var_type)
+    
+    self.gen_compound_stmt(fn.body)
+    
+    self.emit_label(self.lbl_ret)
+    self.emit(f'end')
+    self.emit(f'ret')
+  
   def gen_stmt(self, node):
     if isinstance(node, AstPrintStmt):
       self.gen_print_stmt(node)
+    elif isinstance(node, AstReturnStmt):
+      self.gen_return_stmt(node)
     elif isinstance(node, AstIfStmt):
       self.gen_if_stmt(node)
     elif isinstance(node, AstWhileStmt):
@@ -95,6 +128,12 @@ class CodeGen:
     self.gen_expr(node.body)
     self.emit('print')
   
+  def gen_return_stmt(self, node):
+    if node.body:
+      self.gen_expr(node.body)
+      self.emit('arg')
+    self.emit(f'jmp {self.lbl_ret}')
+  
   def gen_compound_stmt(self, node):
     for stmt in node.body:
       self.gen_stmt(stmt)
@@ -103,7 +142,7 @@ class CodeGen:
     if isinstance(node, AstIdentifier):
       loc = self.scope.find(node.name).loc
       self.emit(f'push {loc}')
-      self.emit(f'rx $sp')
+      self.emit(f'rx $fp')
       self.emit(f'add')
     elif isinstance(node, AstIndex):
       self.gen_expr(node.pos)
@@ -112,7 +151,7 @@ class CodeGen:
       self.gen_lvalue(node.base)
       self.emit(f'add')
     else:
-      self.emit("gen error: not lvalue")
+      raise Exception("gen error: not lvalue")
 
   def gen_expr(self, node):
     if isinstance(node, AstExpr):
@@ -121,9 +160,26 @@ class CodeGen:
       self.gen_binop(node)
     elif isinstance(node, AstConstant):
       self.gen_constant(node)
+    elif isinstance(node, AstCall):
+      self.gen_call(node)
     elif isinstance(node, AstIdentifier) or isinstance(node, AstIndex):
       self.gen_lvalue(node)
       self.emit('load')
+    else:
+      raise Exception("IDK THIS")
+
+  def gen_call(self, node):
+    fn = self.scope.find(node.base.name)
+    
+    if not fn:
+      raise Excpetion("CANT FIND FUNCTION!!!!")
+    
+    for arg in node.args:
+      self.gen_expr(arg)
+      self.emit(f"arg")
+    
+    self.emit(f"call {fn.label}")
+    self.emit(f"param")
 
   def gen_constant(self, node):
     self.emit(f'push {node.value}')

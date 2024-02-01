@@ -1,20 +1,11 @@
-int n = 32;
-int[32] prime;
-
-for (int i = 0; i < n; i = i + 1) {
-  prime[i] = 1;
+fn fib(int n) : int {
+  if (n < 2) {
+    return 1;
+  }
+  
+  return fib(n - 1) + fib(n - 2);
 }
 
-for (int p = 2; p * p < n; p = p + 1) {
-  if (prime[p] > 0) {
-    for (int i = p * p; i < n; i = i + p) {
-      prime[i] = 0;
-    }
-  }
-}
-
-for (int i = 0; i < n; i = i + 1) {
-  if (prime[i] > 0) {
-    print i;
-  }
+for (int i = 0; i < 8; i = i + 1) {
+  print fib(i);
 }

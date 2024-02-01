@@ -17,12 +17,16 @@ def ast_body(node):
 def ast_stmt(scope, node):
   if isinstance(node, AstPrintStmt):
     return [ast_print_stmt(scope, node)]
+  if isinstance(node, AstReturnStmt):
+    return [ast_return_stmt(scope, node)]
   elif isinstance(node, AstIfStmt):
     return [ast_if_stmt(scope, node)]
   elif isinstance(node, AstWhileStmt):
     return [ast_while_stmt(scope, node)]
   elif isinstance(node, AstForStmt):
     return [ast_for_stmt(scope, node)]
+  elif isinstance(node, AstFunc):
+    return ast_func(scope, node)
   elif isinstance(node, AstStmt):
     if isinstance(node.body, AstVar):
       return ast_var(scope, node.body)
@@ -30,6 +34,21 @@ def ast_stmt(scope, node):
       return [AstStmt(AstExpr(ast_expr(scope, node.body)))]
   else:
     raise Exception("NOT DONE BAKA!!!")
+
+def ast_func(scope, node):
+  if scope.find(node.name):
+    raise SemanticError(node, f"name '{node.name.text}' has already been declared")
+  
+  scope.insert(node.name.text, node)
+  
+  new_scope = Scope(scope, ret_type=node.var_type, attach_parent=False)
+  
+  for param in node.params:
+    new_scope.insert(param.name.text, param)
+  
+  node.body = ast_compound_stmt(new_scope, node.body)
+  
+  return []
 
 def ast_compound_stmt(scope, node):
   body = []
@@ -66,6 +85,21 @@ def ast_print_stmt(scope, node):
   node.body = ast_expr(scope, node.body)
   return node
 
+def ast_return_stmt(scope, node):
+  if node.body:
+    if not scope.ret_type:
+      raise SemanticError(node, f"returning '{node.body}' but function has no return")
+    
+    node.body = ast_expr(scope, node.body)
+    
+    if not var_type_cmp(node.body.var_type, scope.ret_type):
+      raise SemanticError(node, f"returning '{node.body}' of type '{node.body.var_type}' but expected '{scope.ret_type}'")
+  else:
+    if scope.ret_type:
+      raise SemanticError(node, f"no return value but function returns '{scope.ret_type}'")
+  
+  return node
+
 def ast_var(scope, node):
   if scope.find(node.name):
     raise SemanticError(node, f"name '{node.name.text}' has already been declared")
@@ -94,11 +128,39 @@ def ast_expr(scope, expr):
     return ast_identifier(scope, expr)
   elif isinstance(expr, AstUnaryOp):
     return ast_unary_op(scope, expr)
+  elif isinstance(expr, AstCall):
+    return ast_call(scope, expr)
   elif isinstance(expr, AstIndex):
     return ast_index(scope, expr)
   else:
-    print(type(expr))
     raise Exception(f"NOT DONE BAKA!!!")
+
+def ast_call(scope, node):
+  if not isinstance(node.base, AstIdentifier):
+    raise SemanticError(node, f"cannot call non-function '{node.base}'")
+  
+  fn = scope.find(node.base.name)
+  
+  if not fn:
+    raise SemanticError(node, f"function '{node.base}' is not defined")
+  
+  fn_str = f"{fn.name}({', '.join([ str(x) for x in fn.params])})"
+  
+  if len(node.args) != len(fn.params):
+    raise SemanticError(node, f"'{node}' incorrect number of arguments for '{fn_str}'")
+  
+  args = []
+  for arg in node.args:
+    args.append(ast_expr(scope, arg))
+  node.args = args
+  
+  for arg, param in zip(node.args, fn.params):
+    if not var_type_cmp(arg.var_type, param.var_type):
+      raise SemanticError(node, f"incorrect argument supplied '{arg}' of type '{arg.var_type}' for '{param.name}' in '{fn_str}'")
+  
+  node.var_type = fn.var_type
+  
+  return node
 
 def ast_index(scope, node):
   node.base = ast_expr(scope, node.base)

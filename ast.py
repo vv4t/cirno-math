@@ -1,11 +1,13 @@
 
 class Scope:
-  def __init__(self, parent):
+  def __init__(self, parent, ret_type=None, attach_parent=True):
     self.parent = parent
+    self.ret_type = ret_type
     self.child = []
     self.var = {}
     
-    if self.parent:
+    if self.parent and attach_parent:
+      self.ret_type = self.parent.ret_type
       self.parent.child.append(self)
   
   def insert(self, name, node):
@@ -63,6 +65,15 @@ class AstIndex:
   def __repr__(self):
     return f'{self.base}[{self.pos}]'
 
+class AstCall:
+  def __init__(self, base, args, var_type=None):
+    self.base = base
+    self.args = args
+    self.var_type = None
+  
+  def __repr__(self):
+    return f'{self.base}({", ".join([str(x) for x in self.args])})'
+
 class AstUnaryOp:
   def __init__(self, op, body, var_type=None):
     self.op = op
@@ -109,13 +120,32 @@ class AstVar:
     else:
       return f'{self.var_type} {self.name}'
 
+class AstFunc:
+  def __init__(self, name, params, var_type, body):
+    self.var_type = var_type
+    self.name = name
+    self.params = params
+    self.body = body
+    self.label = None
+  
+  def __repr__(self, pad=0):
+    return f'fn {self.name}({", ".join(self.args)}) {self.body.__repr__(pad=pad+2)}'
+
 class AstPrintStmt:
   def __init__(self, token, body):
     self.token = token
     self.body = body
   
   def __repr__(self):
-    return f'{self.token} {self.body};'
+    return ' ' * pad + f'{self.token} {self.body};'
+
+class AstReturnStmt:
+  def __init__(self, token, body):
+    self.token = token
+    self.body = body
+  
+  def __repr__(self, pad=0):
+    return ' ' * pad + f'{self.token} {self.body};'
 
 class AstIfStmt:
   def __init__(self, cond, body):
@@ -123,7 +153,7 @@ class AstIfStmt:
     self.body = body
   
   def __repr__(self, pad=0):
-    return ' ' * pad + f'if ({self.cond})\n{self.body.__repr__(pad=pad+2)};'
+    return ' ' * pad + f'if ({self.cond}) {self.body.__repr__(pad=pad+2)};'
 
 class AstWhileStmt:
   def __init__(self, cond, body):
@@ -131,7 +161,7 @@ class AstWhileStmt:
     self.body = body
   
   def __repr__(self, pad=0):
-    return ' ' * pad + f'while ({self.cond})\n{self.body.__repr__(pad=pad+2)};'
+    return ' ' * pad + f'while ({self.cond}) {self.body.__repr__(pad=pad+2)};'
 
 class AstForStmt:
   def __init__(self, init, cond, step, body):
@@ -141,7 +171,7 @@ class AstForStmt:
     self.body = body
   
   def __repr__(self, pad=0):
-    return ' ' * pad + f'for ({self.init}; {self.cond}; {self.step})\n{self.body.__repr__(pad=pad+2)};'
+    return ' ' * pad + f'for ({self.init}; {self.cond}; {self.step}) {self.body.__repr__(pad=pad+2)};'
 
 class AstStmt:
   def __init__(self, body):
@@ -156,7 +186,7 @@ class AstBody:
     self.scope = Scope(None)
   
   def __repr__(self, pad=0):
-    return (' ' * pad + '\n').join([ str(stmt) for stmt in self.body ])
+    return '{\n' + '\n'.join([ ' ' * pad + str(stmt) for stmt in self.body ]) + ' ' * pad + '\n}'
 
 class Ast:
   def __init__(self, body):
@@ -172,7 +202,11 @@ def ast_src(node):
     return ast_src(node.body[0])
   elif isinstance(node, AstStmt):
     return ast_src(node.body)
+  elif isinstance(node, AstFunc):
+    return ast_src(node.name)
   elif isinstance(node, AstPrintStmt):
+    return (node.token.line, node.token.src)
+  elif isinstance(node, AstReturnStmt):
     return (node.token.line, node.token.src)
   
   if isinstance(node, AstVar):
@@ -190,9 +224,12 @@ def ast_src(node):
     return (node.op.line, node.op.src)
   elif isinstance(node, AstIndex):
     return ast_src(node.base)
+  elif isinstance(node, AstCall):
+    return ast_src(node.base)
   elif isinstance(node, AstConstant):
     return (node.token.line, node.token.src)
   elif isinstance(node, AstIdentifier):
     return (node.token.line, node.token.src)
   
+  print(type(node))
   raise Exception("I DONT KNOW THIS ONE !!!!!")

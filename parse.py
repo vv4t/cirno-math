@@ -11,7 +11,10 @@ def parse(lex):
   return Ast(body)
 
 def parse_body(lex):
-  stmt = parse_stmt(lex)
+  stmt = find_match([
+    lambda : parse_stmt(lex),
+    lambda : parse_function(lex)
+  ])
   
   if not stmt:
     return None
@@ -20,13 +23,67 @@ def parse_body(lex):
   
   while stmt:
     body.append(stmt)
-    stmt = parse_stmt(lex)
+    stmt = find_match([
+      lambda : parse_stmt(lex),
+      lambda : parse_function(lex)
+    ])
   
   return AstBody(body)
+
+def parse_function(lex):
+  if not lex.accept("fn"):
+    return None
+  
+  name = lex.expect("Identifier")
+  
+  lex.expect("(")
+  params = parse_param_list(lex)
+  lex.expect(")")
+  
+  var_type = None
+  
+  if lex.accept(":"):
+    var_type = parse_var_type(lex)
+    
+    if not var_type:
+      raise LexError(name, "function has no return type")
+  
+  body = parse_compound_stmt(lex)
+  
+  return AstFunc(name, params, var_type, body)
+
+def parse_param_list(lex):
+  param = parse_param(lex)
+  
+  if not param:
+    return []
+  
+  params = [param]
+  
+  while lex.accept(','):
+    param = parse_param(lex)
+    
+    if not param:
+      raise LexError(lex.token, f"expected parameter-declaration before '{lex.token}'")
+    
+    params.append(param)
+  
+  return params
+
+def parse_param(lex):
+  var_type = parse_var_type(lex)
+  
+  if not var_type:
+    return None
+  
+  name = lex.expect("Identifier")
+  
+  return AstVar(var_type, name, None)
 
 def parse_stmt(lex):
   body = find_match([
     lambda : parse_print_stmt(lex),
+    lambda : parse_return_stmt(lex),
     lambda : parse_if_stmt(lex),
     lambda : parse_while_stmt(lex),
     lambda : parse_for_stmt(lex)
@@ -108,6 +165,18 @@ def parse_print_stmt(lex):
   lex.expect(';')
   
   return AstPrintStmt(token, body)
+
+def parse_return_stmt(lex):
+  token = lex.accept("return")
+  
+  if not token:
+    return None
+  
+  body = parse_expr(lex)
+  
+  lex.expect(';')
+  
+  return AstReturnStmt(token, body)
 
 def parse_compound_stmt(lex):
   if not lex.match('{'):
@@ -211,8 +280,30 @@ def parse_postfix(lex):
     pos = parse_expr(lex)
     lex.expect(']')
     return AstIndex(base, pos)
+  elif lex.accept('('):
+    args = parse_arg_list(lex)
+    lex.expect(')')
+    return AstCall(base, args)
   
   return base
+
+def parse_arg_list(lex):
+  arg = parse_expr(lex)
+  
+  if not arg:
+    return []
+  
+  args = [arg]
+  
+  while lex.accept(','):
+    arg = parse_expr(lex)
+    
+    if not arg:
+      raise LexError(lex.token, f"expected argument-expression before '{lex.token}'")
+    
+    args.append(arg)
+  
+  return args
 
 def parse_primitive(lex):
   if lex.match("Number"):
