@@ -34,6 +34,8 @@ class CodeGen:
       self.gen_if_stmt(node)
     elif isinstance(node, AstWhileStmt):
       self.gen_while_stmt(node)
+    elif isinstance(node, AstForStmt):
+      self.gen_for_stmt(node)
     elif isinstance(node, AstStmt):
       if isinstance(node.body, AstExpr):
         self.gen_expr(node.body)
@@ -63,6 +65,28 @@ class CodeGen:
     self.gen_cmp_cond(node.cond, lbl_end)
     self.gen_compound_stmt(node.body)
     self.emit(f'jmp {lbl_cond}')
+    self.emit_label(lbl_end)
+    
+    self.scope = node.body.scope.parent
+  
+  def gen_for_stmt(self, node):
+    self.scope = node.body.scope
+    
+    if len(node.init) > 0:
+      for stmt in node.init:
+        self.gen_stmt(stmt)
+    
+    lbl_cond = self.label()
+    lbl_end = self.label()
+    
+    self.emit_label(lbl_cond)
+    self.gen_cmp_cond(node.cond, lbl_end)
+    
+    self.gen_compound_stmt(node.body)
+    
+    self.gen_expr(node.step)
+    self.emit(f'jmp {lbl_cond}')
+    
     self.emit_label(lbl_end)
     
     self.scope = node.body.scope.parent

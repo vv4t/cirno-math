@@ -21,6 +21,8 @@ def ast_stmt(scope, node):
     return [ast_if_stmt(scope, node)]
   elif isinstance(node, AstWhileStmt):
     return [ast_while_stmt(scope, node)]
+  elif isinstance(node, AstForStmt):
+    return [ast_for_stmt(scope, node)]
   elif isinstance(node, AstStmt):
     if isinstance(node.body, AstVar):
       return ast_var(scope, node.body)
@@ -31,7 +33,7 @@ def ast_stmt(scope, node):
 
 def ast_compound_stmt(scope, node):
   body = []
-  node.scope = Scope(scope)
+  node.scope = scope 
   
   for stmt in node.body:
     body += ast_stmt(node.scope, stmt)
@@ -42,12 +44,22 @@ def ast_compound_stmt(scope, node):
 
 def ast_if_stmt(scope, node):
   node.cond = ast_expr(scope, node.cond)
-  node.body = ast_compound_stmt(scope, node.body)
+  node.body = ast_compound_stmt(Scope(scope), node.body)
   return node
 
 def ast_while_stmt(scope, node):
   node.cond = ast_expr(scope, node.cond)
-  node.body = ast_compound_stmt(scope, node.body)
+  node.body = ast_compound_stmt(Scope(scope), node.body)
+  return node
+
+def ast_for_stmt(scope, node):
+  new_scope = Scope(scope)
+  
+  node.init = ast_stmt(new_scope, node.init)
+  node.cond = ast_expr(new_scope, node.cond)
+  node.step = ast_expr(new_scope, node.step)
+  node.body = ast_compound_stmt(new_scope, node.body)
+  
   return node
 
 def ast_print_stmt(scope, node):
@@ -85,6 +97,7 @@ def ast_expr(scope, expr):
   elif isinstance(expr, AstIndex):
     return ast_index(scope, expr)
   else:
+    print(type(expr))
     raise Exception(f"NOT DONE BAKA!!!")
 
 def ast_index(scope, node):

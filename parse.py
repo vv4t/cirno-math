@@ -28,7 +28,8 @@ def parse_stmt(lex):
   body = find_match([
     lambda : parse_print_stmt(lex),
     lambda : parse_if_stmt(lex),
-    lambda : parse_while_stmt(lex)
+    lambda : parse_while_stmt(lex),
+    lambda : parse_for_stmt(lex)
   ])
   
   if body:
@@ -69,6 +70,32 @@ def parse_while_stmt(lex):
   body = parse_compound_stmt(lex)
   
   return AstWhileStmt(cond, body)
+
+def parse_for_stmt(lex):
+  if not lex.accept("for"):
+    return None
+  
+  lex.expect("(")
+  
+  init = find_match([
+    lambda : parse_expr(lex),
+    lambda : parse_var(lex),
+  ])
+  
+  lex.expect(';')
+  cond = parse_expr(lex)
+  lex.expect(';')
+  
+  step = find_match([
+    lambda : parse_expr(lex),
+    lambda : parse_var(lex),
+  ])
+  
+  lex.expect(")")
+  
+  body = parse_compound_stmt(lex)
+  
+  return AstForStmt(AstStmt(init) if init else None, cond, step, body)
 
 def parse_print_stmt(lex):
   token = lex.accept("print")

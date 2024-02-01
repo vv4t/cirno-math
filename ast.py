@@ -133,6 +133,16 @@ class AstWhileStmt:
   def __repr__(self, pad=0):
     return ' ' * pad + f'while ({self.cond})\n{self.body.__repr__(pad=pad+2)};'
 
+class AstForStmt:
+  def __init__(self, init, cond, step, body):
+    self.init = init
+    self.cond = cond
+    self.step = step
+    self.body = body
+  
+  def __repr__(self, pad=0):
+    return ' ' * pad + f'for ({self.init}; {self.cond}; {self.step})\n{self.body.__repr__(pad=pad+2)};'
+
 class AstStmt:
   def __init__(self, body):
     self.body = body
