@@ -1,4 +1,25 @@
 
+class Scope:
+  def __init__(self, parent):
+    self.parent = parent
+    self.child = []
+    self.var = {}
+    
+    if self.parent:
+      self.parent.child.append(self)
+  
+  def insert(self, name, node):
+    self.var[name] = node
+  
+  def find(self, name):
+    if name not in self.var:
+      if self.parent:
+        return self.parent.find(name)
+      else:
+        return None
+    
+    return self.var[name]
+
 class TypeSpecifier:
   def __init__(self, specifier, token=None):
     self.token = token
@@ -16,18 +37,18 @@ class TypeArray:
     return f'{self.base}[{self.size}]'
 
 class AstConstant:
-  def __init__(self, token, var_type=None):
+  def __init__(self, value, token, var_type=None):
     self.token = token
-    self.value = int(self.token.text)
+    self.value = value
     self.var_type = var_type
   
   def __repr__(self):
     return self.token.__repr__()
 
 class AstIdentifier:
-  def __init__(self, token, var_type=None):
+  def __init__(self, name, token=None, var_type=None):
     self.token = token
-    self.identifier = token.text
+    self.name = name
     self.var_type = var_type
   
   def __repr__(self):
@@ -76,12 +97,17 @@ class AstExpr:
       return f'{self.body}'
 
 class AstVar:
-  def __init__(self, var_type, name):
+  def __init__(self, var_type, name, value):
     self.var_type = var_type
     self.name = name
+    self.value = value
+    self.loc = 0
   
   def __repr__(self):
-    return f'{self.var_type} {self.name}'
+    if self.value:
+      return f'{self.var_type} {self.name} = {self.value}'
+    else:
+      return f'{self.var_type} {self.name}'
 
 class AstPrintStmt:
   def __init__(self, token, body):
@@ -90,13 +116,6 @@ class AstPrintStmt:
   
   def __repr__(self):
     return f'{self.token} {self.body};'
-
-class AstCompoundStmt:
-  def __init__(self, body):
-    self.body = body
-  
-  def __repr__(self, pad=0):
-    return (' ' * pad + '\n').join([ str(stmt) for stmt in self.body ])
 
 class AstIfStmt:
   def __init__(self, cond, body):
@@ -124,10 +143,10 @@ class AstStmt:
 class AstBody:
   def __init__(self, body):
     self.body = body
-    self.var = {}
+    self.scope = Scope(None)
   
-  def __repr__(self):
-    return '\n'.join([ str(stmt) for stmt in self.body ])
+  def __repr__(self, pad=0):
+    return (' ' * pad + '\n').join([ str(stmt) for stmt in self.body ])
 
 class Ast:
   def __init__(self, body):

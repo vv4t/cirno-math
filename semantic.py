@@ -4,15 +4,15 @@ from lex import Token
 def semantic_pass(node):
   return Ast(ast_body(node.body))
 
-def ast_body(scope):
+def ast_body(node):
   body = []
   
-  for stmt in scope.body:
-    body += ast_stmt(scope, stmt)
+  for stmt in node.body:
+    body += ast_stmt(node.scope, stmt)
   
-  scope.body = body
+  node.body = body
   
-  return scope
+  return node
 
 def ast_stmt(scope, node):
   if isinstance(node, AstPrintStmt):
@@ -23,8 +23,7 @@ def ast_stmt(scope, node):
     return [ast_while_stmt(scope, node)]
   elif isinstance(node, AstStmt):
     if isinstance(node.body, AstVar):
-      ast_var(scope, node.body)
-      return []
+      return ast_var(scope, node.body)
     elif isinstance(node.body, AstExpr):
       return [AstStmt(AstExpr(ast_expr(scope, node.body)))]
   else:
@@ -32,9 +31,10 @@ def ast_stmt(scope, node):
 
 def ast_compound_stmt(scope, node):
   body = []
+  node.scope = Scope(scope)
   
   for stmt in node.body:
-    body += ast_stmt(scope, stmt)
+    body += ast_stmt(node.scope, stmt)
   
   node.body = body
   
@@ -55,7 +55,21 @@ def ast_print_stmt(scope, node):
   return node
 
 def ast_var(scope, node):
-  scope.var[node.name.text] = node
+  if scope.find(node.name):
+    raise SemanticError(node, f"name '{node.name.text}' has already been declared")
+  
+  scope.insert(node.name.text, node)
+  
+  if node.value:
+    lhs = AstIdentifier(node.name.text, node.name)
+    op = Token('=', '=')
+    rhs = node.value
+    
+    body = ast_expr(scope, AstBinop(lhs, op, rhs))
+    
+    return [AstStmt(AstExpr(body))]
+  
+  return []
 
 def ast_expr(scope, expr):
   if isinstance(expr, AstExpr):
@@ -89,10 +103,12 @@ def ast_constant(scope, node):
   return node
 
 def ast_identifier(scope, node):
-  if node.identifier not in scope.var:
-    raise SemanticError(node, f"name '{node.identifier}' is not defined")
+  var = scope.find(node.name)
   
-  node.var_type = scope.var[node.identifier].var_type
+  if not var:
+    raise SemanticError(node, f"name '{node.name}' is not defined")
+  
+  node.var_type = var.var_type
   
   return node
 
@@ -103,7 +119,7 @@ def ast_binop(scope, node):
   if binop_type_cmp(node, (TypeSpecifier("int"), TypeSpecifier("int"))):
     node.var_type = TypeSpecifier("int")
   else:
-    raise SemanticError(node, f"unsupported operand type(s) for '{node.op}': '{lhs.var_type}' and '{rhs.var_type}'")
+    raise SemanticError(node, f"unsupported operand type(s) for '{node.op}': '{node.lhs.var_type}' and '{node.rhs.var_type}'")
   
   return node 
 

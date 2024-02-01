@@ -6,7 +6,7 @@ class LexError(Exception):
     super().__init__(f'{token.src}:{token.line}: {message}')
 
 class Token:
-  def __init__(self, token_type, text, line, src):
+  def __init__(self, token_type, text, line=0, src="None"):
     self.token_type = token_type
     self.text = text
     self.line = line
@@ -35,9 +35,9 @@ class Lex:
       return None
     
     self.token = find_match([
-      self.match_number(),
-      self.match_identifier(),
-      self.match_symbol()
+      lambda : self.match_number(),
+      lambda : self.match_identifier(),
+      lambda : self.match_symbol()
     ])
     
     if not self.token:

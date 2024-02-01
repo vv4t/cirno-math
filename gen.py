@@ -3,18 +3,28 @@ from semantic import var_type_cmp
 
 class CodeGen:
   def __init__(self, node):
-    self.var = {}
-    self.stack_size = 0
     self.code = []
     self.lbl_name = 0
+    self.scope = None
     self.gen_body(node.body)
   
-  def gen_body(self, node):
-    for var in node.var.values():
-      self.var[var.name.text] = self.stack_size
-      self.stack_size += type_sizeof(var.var_type)
+  def var_alloc(self, scope):
+    size = 0
     
-    self.emit(f'frame {self.stack_size}')
+    for var in scope.var.values():
+      var.loc = size
+      size += type_sizeof(var.var_type)
+    
+    for child in scope.child:
+      size += self.var_alloc(child)
+    
+    return size
+  
+  def gen_body(self, node):
+    self.scope = node.scope
+    
+    size = self.var_alloc(self.scope)
+    self.emit(f'frame {size}')
     
     for stmt in node.body:
       self.gen_stmt(stmt)
@@ -29,25 +39,35 @@ class CodeGen:
     elif isinstance(node, AstStmt):
       if isinstance(node.body, AstExpr):
         self.gen_expr(node.body)
+      else:
+        raise Exception("NOT DONE YET BAKA")
     else:
       raise Exception("NOT DONE YET BAKA")
   
   def gen_if_stmt(self, node):
     lbl_end = self.label()
+
+    self.scope = node.body.scope
     
     self.gen_cmp_cond(node.cond, lbl_end)
     self.gen_compound_stmt(node.body)
     self.emit_label(lbl_end)
+    
+    self.scope = node.body.scope.parent
   
   def gen_while_stmt(self, node):
     lbl_cond = self.label()
     lbl_end = self.label()
+    
+    self.scope = node.body.scope
     
     self.emit_label(lbl_cond)
     self.gen_cmp_cond(node.cond, lbl_end)
     self.gen_compound_stmt(node.body)
     self.emit(f'jmp {lbl_cond}')
     self.emit_label(lbl_end)
+    
+    self.scope = node.body.scope.parent
   
   def gen_print_stmt(self, node):
     self.gen_expr(node.body)
@@ -59,7 +79,7 @@ class CodeGen:
   
   def gen_lvalue(self, node):
     if isinstance(node, AstIdentifier):
-      loc = self.var[node.identifier]
+      loc = self.scope.find(node.name).loc
       self.emit(f'push {loc}')
       self.emit(f'rx $sp')
       self.emit(f'add')

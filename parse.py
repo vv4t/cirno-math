@@ -26,17 +26,17 @@ def parse_body(lex):
 
 def parse_stmt(lex):
   body = find_match([
-    parse_print_stmt(lex),
-    parse_if_stmt(lex),
-    parse_while_stmt(lex)
+    lambda : parse_print_stmt(lex),
+    lambda : parse_if_stmt(lex),
+    lambda : parse_while_stmt(lex)
   ])
   
   if body:
     return body
   
   body = find_match([
-    parse_expr(lex),
-    parse_var(lex),
+    lambda : parse_expr(lex),
+    lambda : parse_var(lex),
   ])
   
   if not body:
@@ -84,7 +84,7 @@ def parse_print_stmt(lex):
 
 def parse_compound_stmt(lex):
   if not lex.match('{'):
-    return AstCompoundStmt([ parse_stmt(lex) ])
+    return AstBody([ parse_stmt(lex) ])
   
   lex.expect('{')
   
@@ -101,7 +101,7 @@ def parse_compound_stmt(lex):
   
   lex.expect('}')
   
-  return AstCompoundStmt(body)
+  return AstBody(body)
 
 def parse_var(lex):
   var_type = parse_var_type(lex)
@@ -111,13 +111,17 @@ def parse_var(lex):
   
   name = lex.expect("Identifier")
   
-  if not name:
-    return None
+  value = None
   
-  return AstVar(var_type, name)
+  if lex.accept('='):
+    value = parse_expr(lex)
+  
+  return AstVar(var_type, name, value)
 
 def parse_var_type(lex):
-  specifier = find_match([ lex.accept("int") ])
+  specifier = find_match([
+    lambda : lex.accept("int")
+  ])
   
   if not specifier:
     return None
@@ -132,7 +136,11 @@ def parse_var_type(lex):
   return var_type
 
 def parse_expr(lex):
-  body = find_match([ parse_binop(lex), parse_primitive(lex) ])
+  body = find_match([
+    lambda : parse_binop(lex),
+    lambda : parse_postfix(lex),
+    lambda : parse_primitive(lex)
+  ])
   
   if not body:
     return None
@@ -157,7 +165,7 @@ def parse_binop_level(lex, level):
   
   lhs = parse_binop_level(lex, level + 1)
   
-  op = find_match([ lex.accept(op) for op in op_set[level] ])
+  op = find_match([ (lambda y: (lambda : lex.accept(y)))(x) for x in op_set[level] ])
   
   if not op:
     return lhs
@@ -181,10 +189,12 @@ def parse_postfix(lex):
 
 def parse_primitive(lex):
   if lex.match("Number"):
-    return AstConstant(lex.pop())
+    token = lex.pop()
+    return AstConstant(int(token.text), token)
   
   if lex.match("Identifier"):
-    return AstIdentifier(lex.pop())
+    token = lex.pop()
+    return AstIdentifier(token.text, token)
   
   if lex.accept("("):
     body = AstExpr(parse_expr(lex), bracket=True)

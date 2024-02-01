@@ -1,37 +1,8 @@
-int[32] A;
+int a = 1;
 
-int i;
-int n;
+print a;
 
-n = 32;
-
-i = 0;
-while (i < n) {
-  A[i] = 1;
-  i = i + 1;
-}
-
-int p;
-
-p = 2;
-while (p*p < n) {
-  i = p*p;
-  
-  if (A[p] > 0) {
-    while (i < n) {
-      A[i] = 0;
-      i = i + p;
-    }
-  }
-  
-  p = p + 1;
-}
-
-i = 0;
-while (i < n) {
-  if (A[i] > 0) {
-    print i;
-  }
-  
-  i = i + 1;
+if (a < 5) {
+  int b = 4;
+  print b;
 }

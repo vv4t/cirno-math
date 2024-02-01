@@ -1,6 +1,9 @@
 
 def find_match(matches):
-  if not any(matches):
-    return None
+  for match in matches:
+    res = match()
+    
+    if res:
+      return res
   
-  return next((match for match in matches if match is not None))
+  return None
