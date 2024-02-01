@@ -1,4 +1,5 @@
 from ast import *
+from semantic import var_type_cmp
 
 class CodeGen:
   def __init__(self, node):
@@ -102,6 +103,12 @@ class CodeGen:
       self.emit(f'jgt {lbl_else}')
   
   def gen_binop(self, node):
+    if var_type_cmp(node.lhs.var_type, TypeSpecifier("int")) and var_type_cmp(node.rhs.var_type, TypeSpecifier("int")):
+      self.gen_binop_int_int(node)
+    else:
+      raise Exception("IDK!!!")
+  
+  def gen_binop_int_int(self, node):
     if node.op.text == "=":
       self.gen_lvalue(node.lhs)
       self.gen_expr(node.rhs)
@@ -147,3 +154,5 @@ def type_sizeof(var_type):
       return 4
   elif isinstance(var_type, TypeArray):
     return var_type.size * type_sizeof(var_type.base)
+  else:
+    raise Exception("I DONT KNOW THIS ONE!!!")

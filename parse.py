@@ -122,7 +122,7 @@ def parse_var_type(lex):
   if not specifier:
     return None
   
-  var_type = TypeSpecifier(specifier)
+  var_type = TypeSpecifier(specifier.text, token=specifier)
   
   if lex.accept('['):
     size = lex.expect("Number")

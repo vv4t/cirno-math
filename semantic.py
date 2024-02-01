@@ -85,7 +85,7 @@ def ast_unary_op(scope, node):
   return node
 
 def ast_constant(scope, node):
-  node.var_type = TypeSpecifier(Token("int", "int", 0, "builtin"))
+  node.var_type = TypeSpecifier("int")
   return node
 
 def ast_identifier(scope, node):
@@ -97,13 +97,19 @@ def ast_identifier(scope, node):
   return node
 
 def ast_binop(scope, node):
-  lhs = ast_expr(scope, node.lhs)
-  rhs = ast_expr(scope, node.rhs)
+  node.lhs = ast_expr(scope, node.lhs)
+  node.rhs = ast_expr(scope, node.rhs)
   
-  if not var_type_cmp(lhs.var_type, rhs.var_type):
-    raise SemanticError(node, f"unsupported operand type(s) for '{node.op}': '{lhs.var_type}' and '{rhs.var_type}")
+  if binop_type_cmp(node, (TypeSpecifier("int"), TypeSpecifier("int"))):
+    node.var_type = TypeSpecifier("int")
+  else:
+    raise SemanticError(node, f"unsupported operand type(s) for '{node.op}': '{lhs.var_type}' and '{rhs.var_type}'")
   
-  return AstBinop(lhs, node.op, rhs, var_type=lhs.var_type)
+  return node 
+
+def binop_type_cmp(node, cmp_type):
+  lhs, rhs = cmp_type
+  return var_type_cmp(node.lhs.var_type, lhs) and var_type_cmp(node.rhs.var_type, rhs)
 
 def var_type_cmp(a, b):
   if type(a) != type(b):

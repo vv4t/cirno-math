@@ -1,8 +1,8 @@
 
 class TypeSpecifier:
-  def __init__(self, token):
+  def __init__(self, specifier, token=None):
     self.token = token
-    self.specifier = token.text
+    self.specifier = specifier
   
   def __repr__(self):
     return f'{self.specifier}'
