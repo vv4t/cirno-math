@@ -8,22 +8,20 @@ class CodeGen:
     self.scope = None
     self.gen_body(node.body)
   
-  def var_alloc(self, scope):
-    size = 0
-    
+  def var_alloc(self, scope, size):
     for var in scope.var.values():
       var.loc = size
       size += type_sizeof(var.var_type)
     
     for child in scope.child:
-      size += self.var_alloc(child)
+      size += self.var_alloc(child, size)
     
     return size
   
   def gen_body(self, node):
     self.scope = node.scope
     
-    size = self.var_alloc(self.scope)
+    size = self.var_alloc(self.scope, 0)
     self.emit(f'frame {size}')
     
     for stmt in node.body:
