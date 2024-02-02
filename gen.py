@@ -7,6 +7,7 @@ class CodeGen:
     self.lbl_name = 0
     self.lbl_main = 'label_main'
     self.scope = None
+    self.reset = False
     self.gen_body(node.body)
   
   def var_alloc(self, scope, size):
