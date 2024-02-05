@@ -1,11 +1,12 @@
-fn fib(int n) : int {
-  if (n < 2) {
-    return 1;
-  }
+
+fn test(int[3] x) : int {
+  x[0] = 4;
   
-  return fib(n - 1) + fib(n - 2);
+  return 4;
 }
 
-for (int i = 0; i < 8; i = i + 1) {
-  print fib(i);
-}
+int[3] a;
+
+test(a);
+
+print a[0];

@@ -33,6 +33,8 @@ class CodeGen:
     
     for stmt in node.body:
       self.gen_stmt(stmt)
+    
+    self.emit(f'end')
   
   def gen_func(self, fn):
     size = self.var_alloc(fn.body.scope, 0)
@@ -46,9 +48,7 @@ class CodeGen:
     
     loc = 0
     for param in reversed(fn.params):
-      self.emit(f'push {loc}')
-      self.emit("rx $fp")
-      self.emit("add")
+      self.gen_lvalue(AstIdentifier(param.name.text, token=param.name, var_type=param.var_type))
       self.emit("param")
       self.emit("store")
       loc += type_sizeof(param.var_type)
@@ -149,8 +149,10 @@ class CodeGen:
       self.gen_expr(node.pos)
       self.emit(f'push {type_sizeof(node.var_type)}')
       self.emit(f'mul')
-      self.gen_lvalue(node.base)
+      self.gen_expr(node.base)
       self.emit(f'add')
+    elif isinstance(node, AstUnaryOp) and node.op.text == '*':
+      self.gen_expr(node.body)
     else:
       raise Exception("gen error: not lvalue")
 
@@ -159,11 +161,26 @@ class CodeGen:
       self.gen_expr(node.body)
     elif isinstance(node, AstBinop):
       self.gen_binop(node)
+    elif isinstance(node, AstUnaryOp):
+      self.gen_unary_op(node)
     elif isinstance(node, AstConstant):
       self.gen_constant(node)
     elif isinstance(node, AstCall):
       self.gen_call(node)
     elif isinstance(node, AstIdentifier) or isinstance(node, AstIndex):
+      self.gen_lvalue(node)
+      self.emit('load')
+    else:
+      raise Exception("IDK THIS")
+
+  def gen_unary_op(self, node):
+    if node.op == '-':
+      self.gen_expr(node.body)
+      self.emit("push -1")
+      self.emit("mul")
+    if node.op == '&':
+      self.gen_lvalue(node.body)
+    elif node.op == '*':
       self.gen_lvalue(node)
       self.emit('load')
     else:
@@ -202,7 +219,15 @@ class CodeGen:
       self.emit(f'jgt {lbl_else}')
   
   def gen_binop(self, node):
-    if var_type_cmp(node.lhs.var_type, TypeSpecifier("int")) and var_type_cmp(node.rhs.var_type, TypeSpecifier("int")):
+    if (
+      var_type_cmp(node.lhs.var_type, TypeSpecifier("int")) and
+      var_type_cmp(node.rhs.var_type, TypeSpecifier("int")) or
+      (
+        isinstance(node.lhs.var_type, TypePointer) and
+        isinstance(node.rhs.var_type, TypePointer) and
+        var_type_cmp(node.lhs.var_type.base, node.rhs.var_type.base)
+      )
+    ):
       self.gen_binop_int_int(node)
     else:
       raise Exception("IDK!!!")
@@ -253,5 +278,7 @@ def type_sizeof(var_type):
       return 4
   elif isinstance(var_type, TypeArray):
     return var_type.size * type_sizeof(var_type.base)
+  elif isinstance(var_type, TypePointer):
+    return 4
   else:
     raise Exception("I DONT KNOW THIS ONE!!!")

@@ -224,10 +224,15 @@ def parse_var_type(lex):
   
   var_type = TypeSpecifier(specifier.text, token=specifier)
   
-  if lex.accept('['):
-    size = lex.expect("Number")
-    lex.expect(']')
-    var_type = TypeArray(var_type, int(size.text))
+  while True:
+    if lex.accept('['):
+      size = lex.expect("Number")
+      lex.expect(']')
+      var_type = TypeArray(var_type, int(size.text))
+    elif lex.accept('*'):
+      var_type = TypePointer(var_type)
+    else:
+      break
   
   return var_type
 
@@ -257,7 +262,7 @@ def parse_binop_level(lex, level):
   ]
   
   if level == len(op_set):
-    return parse_postfix(lex)
+    return parse_unary_op(lex)
   
   lhs = parse_binop_level(lex, level + 1)
   
@@ -272,6 +277,19 @@ def parse_binop_level(lex, level):
     raise LexError(op, f"expected 'Expression' after '{op}' but found {lex.token.text}")
   
   return AstBinop(lhs, op, rhs)
+
+def parse_unary_op(lex):
+  op = find_match([
+    lambda : lex.accept('-'),
+    lambda : lex.accept('+'),
+    lambda : lex.accept('&'),
+    lambda : lex.accept('*'),
+  ])
+  
+  if op:
+    return AstUnaryOp(op.text, parse_unary_op(lex), token=op)
+  else:
+    return parse_postfix(lex)
 
 def parse_postfix(lex):
   base = parse_primitive(lex)

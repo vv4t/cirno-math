@@ -44,6 +44,9 @@ def ast_func(scope, node):
   new_scope = Scope(scope, ret_type=node.var_type, attach_parent=False)
   
   for param in node.params:
+    if isinstance(param.var_type, TypeArray):
+      param.var_type = TypePointer(param.var_type.base)
+    
     new_scope.insert(param.name.text, param)
   
   node.body = ast_compound_stmt(new_scope, node.body)
@@ -122,12 +125,12 @@ def ast_expr(scope, expr):
     return ast_expr(scope, expr.body)
   elif isinstance(expr, AstBinop):
     return ast_binop(scope, expr)
+  elif isinstance(expr, AstUnaryOp):
+    return ast_unary_op(scope, expr)
   elif isinstance(expr, AstConstant):
     return ast_constant(scope, expr)
   elif isinstance(expr, AstIdentifier):
     return ast_identifier(scope, expr)
-  elif isinstance(expr, AstUnaryOp):
-    return ast_unary_op(scope, expr)
   elif isinstance(expr, AstCall):
     return ast_call(scope, expr)
   elif isinstance(expr, AstIndex):
@@ -165,12 +168,29 @@ def ast_call(scope, node):
 def ast_index(scope, node):
   node.base = ast_expr(scope, node.base)
   node.pos = ast_expr(scope, node.pos)
+  
+  if not isinstance(node.base.var_type, TypeArray) and not isinstance(node.base.var_type, TypePointer):
+    raise SemanticError(node.base, f"subscripted value '{node.base}' is neither array nor pointer.");
+  
   node.var_type = node.base.var_type.base
+  
   return node
 
 def ast_unary_op(scope, node):
   node.body = ast_expr(scope, node.body)
-  node.var_type = node.body.var_type
+  
+  if node.op == "+":
+    return ast_expr(scope, node.body)
+  elif node.op == "&":
+    node.var_type = TypePointer(node.body.var_type)
+  elif node.op == "*":
+    if not isinstance(node.body.var_type, TypePointer):
+      raise SemanticError(node, f"invalid type argument of unary '*' (have '{node.body.var_type}')")
+    
+    node.var_type = node.body.var_type.base
+  else:
+    node.var_type = node.body.var_type
+  
   return node
 
 def ast_constant(scope, node):
@@ -183,7 +203,10 @@ def ast_identifier(scope, node):
   if not var:
     raise SemanticError(node, f"name '{node.name}' is not defined")
   
-  node.var_type = var.var_type
+  if isinstance(var.var_type, TypeArray):
+    node = AstUnaryOp('&', node, var_type=TypePointer(var.var_type.base))
+  else:
+    node.var_type = var.var_type
   
   return node
 
@@ -191,16 +214,21 @@ def ast_binop(scope, node):
   node.lhs = ast_expr(scope, node.lhs)
   node.rhs = ast_expr(scope, node.rhs)
   
-  if binop_type_cmp(node, (TypeSpecifier("int"), TypeSpecifier("int"))):
+  if (
+    var_type_cmp(node.lhs.var_type, TypeSpecifier("int")) and
+    var_type_cmp(node.rhs.var_type, TypeSpecifier("int"))
+  ):
     node.var_type = TypeSpecifier("int")
+  elif (
+    isinstance(node.lhs.var_type, TypePointer) and
+    isinstance(node.rhs.var_type, TypePointer) and
+    var_type_cmp(node.lhs.var_type.base, node.rhs.var_type.base)
+  ):
+    node.var_type = node.lhs.var_type
   else:
     raise SemanticError(node, f"unsupported operand type(s) for '{node.op}': '{node.lhs.var_type}' and '{node.rhs.var_type}'")
   
   return node 
-
-def binop_type_cmp(node, cmp_type):
-  lhs, rhs = cmp_type
-  return var_type_cmp(node.lhs.var_type, lhs) and var_type_cmp(node.rhs.var_type, rhs)
 
 def var_type_cmp(a, b):
   if type(a) != type(b):
@@ -209,7 +237,10 @@ def var_type_cmp(a, b):
     return a.specifier == b.specifier
   elif isinstance(a, TypeArray):
     return var_type_cmp(a.base, b.base) and a.size == b.size
+  elif isinstance(a, TypePointer) and isinstance(b, TypePointer):
+    return var_type_cmp(a.base, b.base)
   else:
+    print(type(a), type(b))
     raise Exception("I DONT KNOW THIS ONE!!!")
 
 class SemanticError(Exception):

@@ -30,6 +30,13 @@ class TypeSpecifier:
   def __repr__(self):
     return f'{self.specifier}'
 
+class TypePointer:
+  def __init__(self, base):
+    self.base = base
+  
+  def __repr__(self):
+    return f'{self.base}*'
+
 class TypeArray:
   def __init__(self, base, size):
     self.base = base
@@ -75,7 +82,8 @@ class AstCall:
     return f'{self.base}({", ".join([str(x) for x in self.args])})'
 
 class AstUnaryOp:
-  def __init__(self, op, body, var_type=None):
+  def __init__(self, op, body, token=None, var_type=None):
+    self.token = token
     self.op = op
     self.body = body
     self.var_type = var_type
@@ -221,7 +229,7 @@ def ast_src(node):
   elif isinstance(node, AstBinop):
     return ast_src(node.lhs)
   elif isinstance(node, AstUnaryOp):
-    return (node.op.line, node.op.src)
+    return (node.token.line, node.token.src)
   elif isinstance(node, AstIndex):
     return ast_src(node.base)
   elif isinstance(node, AstCall):
