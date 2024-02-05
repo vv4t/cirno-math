@@ -40,6 +40,8 @@ class VM:
       
       if args[0] == "push":
         self.push(int(args[1]))
+      elif args[0] == "pop":
+        self.pop()
       elif args[0] == "rx":
         registers = {
           "$fp": self.fp,
@@ -124,5 +126,4 @@ class VM:
       # print("  " + info)
       
       self.pc += 1
-    print(self.sp)
-  
+    print("$sp:", self.sp)

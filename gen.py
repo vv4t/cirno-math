@@ -7,7 +7,7 @@ class CodeGen:
     self.lbl_name = 0
     self.lbl_main = 'label_main'
     self.scope = None
-    self.reset = False
+    self.ax = 0
     self.gen_body(node.body)
   
   def var_alloc(self, scope, size):
@@ -34,7 +34,7 @@ class CodeGen:
     for stmt in node.body:
       self.gen_stmt(stmt)
     
-    self.emit(f'end')
+    # self.emit(f'end')
   
   def gen_func(self, fn):
     size = self.var_alloc(fn.body.scope, 0)
@@ -51,7 +51,10 @@ class CodeGen:
       self.gen_lvalue(AstIdentifier(param.name.text, token=param.name, var_type=param.var_type))
       self.emit("param")
       self.emit("store")
+      
       loc += type_sizeof(param.var_type)
+      
+      self.ax -= 1
     
     self.gen_compound_stmt(fn.body)
     
@@ -77,6 +80,11 @@ class CodeGen:
         raise Exception("NOT DONE YET BAKA")
     else:
       raise Exception("NOT DONE YET BAKA")
+    
+    for i in range(self.ax):
+      self.emit('pop')
+    
+    self.ax = 0
   
   def gen_if_stmt(self, node):
     lbl_end = self.label()
@@ -128,11 +136,14 @@ class CodeGen:
   def gen_print_stmt(self, node):
     self.gen_expr(node.body)
     self.emit('print')
+    self.ax -= 1
   
   def gen_return_stmt(self, node):
     if node.body:
       self.gen_expr(node.body)
       self.emit('arg')
+      self.ax -= 1
+    
     self.emit(f'jmp {self.lbl_ret}')
   
   def gen_compound_stmt(self, node):
@@ -145,12 +156,16 @@ class CodeGen:
       self.emit(f'push {loc}')
       self.emit(f'rx $fp')
       self.emit(f'add')
+      
+      self.ax += 1
     elif isinstance(node, AstIndex):
       self.gen_expr(node.pos)
       self.emit(f'push {type_sizeof(node.var_type)}')
       self.emit(f'mul')
       self.gen_expr(node.base)
       self.emit(f'add')
+      
+      self.ax -= 1
     elif isinstance(node, AstUnaryOp) and node.op.text == '*':
       self.gen_expr(node.body)
     else:
@@ -194,13 +209,17 @@ class CodeGen:
     
     for arg in node.args:
       self.gen_expr(arg)
+      self.ax -= 1
       self.emit(f"arg")
     
     self.emit(f"call {fn.label}")
     self.emit(f"param")
+    
+    self.ax += 1
 
   def gen_constant(self, node):
     self.emit(f'push {node.value}')
+    self.ax += 1
   
   def gen_cmp_cond(self, node, lbl_end, lbl_else=None):
     if not lbl_else:
@@ -217,6 +236,8 @@ class CodeGen:
       self.emit(f'jge {lbl_else}')
     elif node.op.text == "<=":
       self.emit(f'jgt {lbl_else}')
+    
+    self.ax -= 2
   
   def gen_binop(self, node):
     if (
@@ -237,6 +258,8 @@ class CodeGen:
       self.gen_lvalue(node.lhs)
       self.gen_expr(node.rhs)
       self.emit('store')
+      
+      self.ax -= 2
     elif node.op.text == ">" or node.op.text == "<" or node.op.text == ">=" or node.op.text == "<=":
       lbl_end = self.label()
       lbl_else = self.label()
@@ -247,6 +270,8 @@ class CodeGen:
       self.emit_label(lbl_else)
       self.emit("push 0")
       self.emit_label(lbl_end)
+      
+      self.ax += 1
     else:
       self.gen_expr(node.lhs)
       self.gen_expr(node.rhs)
@@ -261,6 +286,8 @@ class CodeGen:
         self.emit("div")
       else:
         raise Exception("I DONT KNOW THIS ONE!!!")
+      
+      self.ax -= 1
   
   def label(self):
     self.lbl_name += 1
