@@ -228,9 +228,10 @@ class CodeGen:
       self.emit(f"arg")
     
     self.emit(f"call {fn.label}")
-    self.emit(f"param")
     
-    self.ax += 1
+    if fn.var_type:
+      self.emit(f"param")
+      self.ax += 1
 
   def gen_constant(self, node):
     self.emit(f'push {node.value}')

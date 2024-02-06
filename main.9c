@@ -4,11 +4,9 @@ class vec2 {
   int y;
 }
 
-fn test(vec2 *x) : int {
+fn test(vec2 *x) {
   x->x = 3;
   x->y = 4;
-  
-  return 5;
 }
 
 vec2 v;
