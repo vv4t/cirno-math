@@ -27,6 +27,8 @@ def ast_stmt(scope, node):
     return [ast_for_stmt(scope, node)]
   elif isinstance(node, AstFunc):
     return ast_func(scope, node)
+  elif isinstance(node, AstClass):
+    return ast_class(scope, node)
   elif isinstance(node, AstStmt):
     if isinstance(node.body, AstVar):
       return ast_var(scope, node.body)
@@ -34,6 +36,16 @@ def ast_stmt(scope, node):
       return [AstStmt(AstExpr(ast_expr(scope, node.body)))]
   else:
     raise Exception("NOT DONE BAKA!!!")
+
+def ast_class(scope, node):
+  node.scope = Scope(None)
+  
+  for member in node.members:
+    node.scope.insert(member.name.text, member)
+  
+  scope.class_type[node.name.text] = node
+  
+  return []
 
 def ast_func(scope, node):
   if scope.find(node.name):
@@ -135,8 +147,37 @@ def ast_expr(scope, expr):
     return ast_call(scope, expr)
   elif isinstance(expr, AstIndex):
     return ast_index(scope, expr)
+  elif isinstance(expr, AstAccess):
+    return ast_access(scope, expr)
   else:
     raise Exception(f"NOT DONE BAKA!!!")
+
+def ast_access(scope, node):
+  node.base = ast_expr(scope, node.base)
+  
+  base_type = node.base.var_type
+  
+  if isinstance(base_type, TypePointer):
+    base_type = node.base.var_type.base
+  
+  if not isinstance(base_type, TypeSpecifier) or base_type.specifier != "class":
+    raise SemanticError(node, f"request for member '{node.name.text}' for something not a class.")
+  
+  if isinstance(node.base.var_type, TypePointer):
+    if node.direct:
+      raise SemanticError(node, f"indirect request for member '{node.name.text}' from non-pointer.")
+  else:
+    if not node.direct:
+      raise SemanticError(node, f"direct request for member '{node.name.text}' from pointer.")
+  
+  member = base_type.class_type.scope.find(node.name.text)
+  
+  if not member:
+    raise SemanticError(node, f"'{node.base.var_type}' has no attribute '{node.name.text}'")
+  
+  node.var_type = member.var_type
+  
+  return node
 
 def ast_call(scope, node):
   if not isinstance(node.base, AstIdentifier):
@@ -234,7 +275,11 @@ def var_type_cmp(a, b):
   if type(a) != type(b):
     return False
   elif isinstance(a, TypeSpecifier):
-    return a.specifier == b.specifier
+    if a.specifier == b.specifier:
+      if a.specifier == "class":
+        return a.class_type.name.text == b.class_type.name.text
+      else:
+        return True
   elif isinstance(a, TypeArray):
     return var_type_cmp(a.base, b.base) and a.size == b.size
   elif isinstance(a, TypePointer) and isinstance(b, TypePointer):

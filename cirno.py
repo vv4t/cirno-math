@@ -1,12 +1,12 @@
 from vm import VM
 from lex import Lex, LexError
-from parse import parse
+from parse import Parse
 from gen import CodeGen
 from semantic import semantic_pass, SemanticError
 
 try:
   lex = Lex("main.9c")
-  node = parse(lex)
+  node = Parse(lex).parse()
 
   node = semantic_pass(node)
 

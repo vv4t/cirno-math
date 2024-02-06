@@ -22,6 +22,9 @@ class CodeGen:
     return size
   
   def gen_body(self, node):
+    for class_type in node.scope.class_type.values():
+      class_type.size = self.var_alloc(class_type.scope, 0)
+    
     for fn in node.scope.var.values():
       if isinstance(fn, AstFunc):
         self.gen_func(fn)
@@ -34,7 +37,7 @@ class CodeGen:
     for stmt in node.body:
       self.gen_stmt(stmt)
     
-    # self.emit(f'end')
+    self.emit(f'end')
   
   def gen_func(self, fn):
     size = self.var_alloc(fn.body.scope, 0)
@@ -168,6 +171,18 @@ class CodeGen:
       self.ax -= 1
     elif isinstance(node, AstUnaryOp) and node.op.text == '*':
       self.gen_expr(node.body)
+    elif isinstance(node, AstAccess):
+      if node.direct:
+        self.gen_lvalue(node.base)
+        class_type = node.base.var_type.class_type
+      else:
+        self.gen_expr(node.base)
+        class_type = node.base.var_type.base.class_type
+      
+      member = class_type.scope.find(node.name.text)
+      
+      self.emit(f'push {member.loc}')
+      self.emit(f'add')
     else:
       raise Exception("gen error: not lvalue")
 
@@ -182,7 +197,7 @@ class CodeGen:
       self.gen_constant(node)
     elif isinstance(node, AstCall):
       self.gen_call(node)
-    elif isinstance(node, AstIdentifier) or isinstance(node, AstIndex):
+    elif isinstance(node, AstIdentifier) or isinstance(node, AstIndex) or isinstance(node, AstAccess):
       self.gen_lvalue(node)
       self.emit('load')
     else:
@@ -303,6 +318,8 @@ def type_sizeof(var_type):
   if isinstance(var_type, TypeSpecifier):
     if var_type.specifier == "int":
       return 4
+    elif var_type.specifier == "class":
+      return var_type.class_type.size
   elif isinstance(var_type, TypeArray):
     return var_type.size * type_sizeof(var_type.base)
   elif isinstance(var_type, TypePointer):

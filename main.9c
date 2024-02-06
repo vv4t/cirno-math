@@ -1,13 +1,20 @@
 
-fn fib(int n) : int {
-  if (n < 2) {
-    return 1;
-  }
-  
-  return fib(n - 1) + fib(n - 2);
-  
+class vec2 {
+  int x;
+  int y;
 }
 
-for (int i = 0; i < 10; i = i + 1) {
-  print fib(i);
+fn test(vec2 *x) : int {
+  x->x = 3;
+  x->y = 4;
+  
+  return 5;
 }
+
+vec2 v;
+v.x = 3;
+v.y = 4;
+test(&v);
+
+print v.x;
+print v.y;

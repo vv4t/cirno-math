@@ -4,6 +4,7 @@ class Scope:
     self.parent = parent
     self.ret_type = ret_type
     self.child = []
+    self.class_type = {}
     self.var = {}
     
     if self.parent and attach_parent:
@@ -23,12 +24,16 @@ class Scope:
     return self.var[name]
 
 class TypeSpecifier:
-  def __init__(self, specifier, token=None):
+  def __init__(self, specifier, class_type=None, token=None):
     self.token = token
     self.specifier = specifier
+    self.class_type = class_type
   
   def __repr__(self):
-    return f'{self.specifier}'
+    if self.specifier == "class":
+      return f'{self.specifier} {self.class_type.name.text}'
+    else:
+      return f'{self.specifier}'
 
 class TypePointer:
   def __init__(self, base):
@@ -71,6 +76,19 @@ class AstIndex:
   
   def __repr__(self):
     return f'{self.base}[{self.pos}]'
+
+class AstAccess:
+  def __init__(self, base, name, direct=True, var_type=None):
+    self.direct = direct
+    self.base = base
+    self.name = name
+    self.var_type = var_type
+  
+  def __repr__(self):
+    if self.direct:
+      return f'{self.base}.{self.name}'
+    else:
+      return f'{self.base}->{self.name}'
 
 class AstCall:
   def __init__(self, base, args, var_type=None):
@@ -127,6 +145,17 @@ class AstVar:
       return f'{self.var_type} {self.name} = {self.value}'
     else:
       return f'{self.var_type} {self.name}'
+
+class AstClass:
+  def __init__(self, name, members, scope=None, size=0):
+    self.name = name
+    self.members = members
+    self.scope = scope
+    self.size = size
+  
+  def __repr__(self, pad=0):
+    members = "\n" + " " * (pad + 2) + ("\n" + " " * (pad + 2)).join([ str(member) for member in self.members ]) + "\n"
+    return f'class {self.name} {{{members}}}'
 
 class AstFunc:
   def __init__(self, name, params, var_type, body):
@@ -238,6 +267,8 @@ def ast_src(node):
     return (node.token.line, node.token.src)
   elif isinstance(node, AstIdentifier):
     return (node.token.line, node.token.src)
+  elif isinstance(node, AstAccess):
+    return ast_src(node.base)
   
   print(type(node))
   raise Exception("I DONT KNOW THIS ONE !!!!!")
