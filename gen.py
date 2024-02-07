@@ -169,7 +169,7 @@ class CodeGen:
       self.emit(f'add')
       
       self.ax -= 1
-    elif isinstance(node, AstUnaryOp) and node.op.text == '*':
+    elif isinstance(node, AstUnaryOp) and node.op == '*':
       self.gen_expr(node.body)
     elif isinstance(node, AstAccess):
       if node.direct:
@@ -244,13 +244,13 @@ class CodeGen:
     self.gen_expr(node.lhs)
     self.gen_expr(node.rhs)
     
-    if node.op.text == ">":
+    if node.op == ">":
       self.emit(f'jle {lbl_else}')
-    elif node.op.text == ">=":
+    elif node.op == ">=":
       self.emit(f'jlt {lbl_else}')
-    elif node.op.text == "<":
+    elif node.op == "<":
       self.emit(f'jge {lbl_else}')
-    elif node.op.text == "<=":
+    elif node.op == "<=":
       self.emit(f'jgt {lbl_else}')
     
     self.ax -= 2
@@ -270,13 +270,13 @@ class CodeGen:
       raise Exception("IDK!!!")
   
   def gen_binop_int_int(self, node):
-    if node.op.text == "=":
+    if node.op == "=":
       self.gen_lvalue(node.lhs)
       self.gen_expr(node.rhs)
       self.emit('store')
       
       self.ax -= 2
-    elif node.op.text == ">" or node.op.text == "<" or node.op.text == ">=" or node.op.text == "<=":
+    elif node.op == ">" or node.op == "<" or node.op == ">=" or node.op == "<=":
       lbl_end = self.label()
       lbl_else = self.label()
       
@@ -292,13 +292,13 @@ class CodeGen:
       self.gen_expr(node.lhs)
       self.gen_expr(node.rhs)
       
-      if node.op.text == "+":
+      if node.op == "+":
         self.emit("add")
-      elif node.op.text == "-":
+      elif node.op == "-":
         self.emit("sub")
-      elif node.op.text == "*":
+      elif node.op == "*":
         self.emit("mul")
-      elif node.op.text == "/":
+      elif node.op == "/":
         self.emit("div")
       else:
         raise Exception("I DONT KNOW THIS ONE!!!")

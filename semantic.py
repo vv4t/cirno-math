@@ -123,10 +123,9 @@ def ast_var(scope, node):
   
   if node.value:
     lhs = AstIdentifier(node.name.text, node.name)
-    op = Token('=', '=')
     rhs = node.value
     
-    body = ast_expr(scope, AstBinop(lhs, op, rhs))
+    body = ast_expr(scope, AstBinop(lhs, '=', rhs))
     
     return [AstStmt(AstExpr(body))]
   
@@ -252,6 +251,10 @@ def ast_identifier(scope, node):
   return node
 
 def ast_binop(scope, node):
+  if node.op in [ "+=", "-=", "*=", "/=" ]:
+    op = node.op.split("=")[0]
+    return ast_binop(scope, AstBinop(node.lhs, '=', AstBinop(node.lhs, op, node.rhs))) 
+  
   node.lhs = ast_expr(scope, node.lhs)
   node.rhs = ast_expr(scope, node.rhs)
   

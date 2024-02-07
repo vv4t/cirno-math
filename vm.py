@@ -126,4 +126,5 @@ class VM:
       # print("  " + info)
       
       self.pc += 1
-    print("$sp:", self.sp)
+    
+    # print("$sp:", self.sp)

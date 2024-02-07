@@ -110,10 +110,11 @@ class AstUnaryOp:
     return f'{self.op}{self.body}'
 
 class AstBinop:
-  def __init__(self, lhs, op, rhs, var_type=None):
+  def __init__(self, lhs, op, rhs, token=None, var_type=None):
     self.lhs = lhs
     self.op = op
     self.rhs = rhs
+    self.token = token
     self.var_type = var_type
   
   def __repr__(self):

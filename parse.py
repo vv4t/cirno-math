@@ -186,7 +186,7 @@ class Parse:
     ])
     
     self.lex.expect(';')
-    cond = slef.parse_expr()
+    cond = self.parse_expr()
     self.lex.expect(';')
     
     step = find_match([
@@ -305,8 +305,7 @@ class Parse:
 
   def parse_binop_level(self, level):
     op_set = [
-      [ "=" ],
-      [ "=" ],
+      [ "+=", "-=", "*=", "/=", "=" ],
       [ "==", "!=" ],
       [ ">=", "<=", "<", ">" ],
       [ "+", "-" ],
@@ -328,7 +327,7 @@ class Parse:
     if not rhs:
       raise LexError(op, f"expected 'Expression' after '{op}' but found {self.lex.token.text}")
     
-    return AstBinop(lhs, op, rhs)
+    return AstBinop(lhs, op.text, rhs, token=op)
 
   def parse_unary_op(self):
     op = find_match([
