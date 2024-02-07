@@ -269,6 +269,12 @@ def ast_binop(scope, node):
     var_type_cmp(node.lhs.var_type.base, node.rhs.var_type.base)
   ):
     node.var_type = node.lhs.var_type
+  elif (
+    isinstance(node.lhs.var_type, TypeSpecifier) and
+    isinstance(node.rhs.var_type, TypeSpecifier) and
+    node.lhs.var_type.class_type.name == node.rhs.var_type.class_type.name
+  ):
+    node.var_type = node.lhs.var_type
   else:
     raise SemanticError(node, f"unsupported operand type(s) for '{node.op}': '{node.lhs.var_type}' and '{node.rhs.var_type}'")
   

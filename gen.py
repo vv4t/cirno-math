@@ -51,13 +51,24 @@ class CodeGen:
     
     loc = 0
     for param in reversed(fn.params):
-      self.gen_lvalue(AstIdentifier(param.name.text, token=param.name, var_type=param.var_type))
-      self.emit("param")
-      self.emit("store")
+      type_size = type_sizeof(param.var_type)
       
-      loc += type_sizeof(param.var_type)
-      
-      self.ax -= 1
+      if type_size > 4:
+        n = type_size // 4
+        
+        for i in range(n):
+          self.gen_lvalue(AstIdentifier(param.name.text, token=param.name, var_type=param.var_type))
+          self.emit(f'push {(n - i - 1) * 4}')
+          self.emit('add')
+          self.emit('param')
+          
+          self.emit(f'store')
+          self.ax -= 1
+      else:
+        self.gen_lvalue(AstIdentifier(param.name.text, token=param.name, var_type=param.var_type))
+        self.emit('param')
+        self.emit(f'store')
+        self.ax -= 1
     
     self.gen_compound_stmt(fn.body)
     
@@ -144,8 +155,22 @@ class CodeGen:
   def gen_return_stmt(self, node):
     if node.body:
       self.gen_expr(node.body)
-      self.emit('arg')
-      self.ax -= 1
+      
+      type_size = type_sizeof(node.body.var_type)
+      
+      if type_size > 4:
+        n = type_size // 4
+        
+        for i in range(n):
+          self.emit("rx $sp")
+          self.emit(f"push {(n-i)*4}")
+          self.emit("sub")
+          self.emit("load")
+          self.emit(f"arg")
+          self.ax -= 1
+      else:
+        self.emit(f"arg")
+        self.ax -= 1
     
     self.emit(f'jmp {self.lbl_ret}')
   
@@ -183,6 +208,8 @@ class CodeGen:
       
       self.emit(f'push {member.loc}')
       self.emit(f'add')
+      
+      self.ax -= 1
     else:
       raise Exception("gen error: not lvalue")
 
@@ -198,10 +225,19 @@ class CodeGen:
     elif isinstance(node, AstCall):
       self.gen_call(node)
     elif isinstance(node, AstIdentifier) or isinstance(node, AstIndex) or isinstance(node, AstAccess):
-      self.gen_lvalue(node)
-      self.emit('load')
+      self.gen_value(node)
     else:
       raise Exception("IDK THIS")
+
+  def gen_value(self, node):
+    type_size = type_sizeof(node.var_type)
+    n = type_size // 4
+    
+    for i in range(n):
+      self.gen_lvalue(node)
+      self.emit(f'push {(n - i - 1) * 4}')
+      self.emit('add')
+      self.emit('load')
 
   def gen_unary_op(self, node):
     if node.op == '-':
@@ -224,14 +260,23 @@ class CodeGen:
     
     for arg in node.args:
       self.gen_expr(arg)
-      self.ax -= 1
-      self.emit(f"arg")
+      
+      type_size = type_sizeof(arg.var_type)
+      n = type_size // 4
+      
+      for i in range(n):
+        self.emit('arg')
+        self.ax -= 1
     
     self.emit(f"call {fn.label}")
     
     if fn.var_type:
-      self.emit(f"param")
-      self.ax += 1
+      type_size = type_sizeof(fn.var_type)
+      n = type_size // 4
+      
+      for i in range(n):
+        self.emit(f"param")
+        self.ax += 1
 
   def gen_constant(self, node):
     self.emit(f'push {node.value}')
@@ -266,6 +311,35 @@ class CodeGen:
       )
     ):
       self.gen_binop_int_int(node)
+    elif (
+      isinstance(node.lhs.var_type, TypeSpecifier) and
+      isinstance(node.rhs.var_type, TypeSpecifier) and
+      node.lhs.var_type.class_type.name == node.rhs.var_type.class_type.name
+    ):
+      self.gen_binop_class_class(node)
+    else:
+      raise Exception("IDK!!!")
+  
+  def gen_binop_class_class(self, node):
+    if node.op == "=":
+      self.gen_expr(node.rhs)
+      
+      type_size = type_sizeof(node.var_type)
+      n = type_size // 4
+      
+      for i in range(n):
+        self.emit('arg')
+        self.ax -= 1
+      
+      for i in range(n):
+        self.gen_lvalue(node.lhs)
+        self.emit(f'push {i*4}')
+        self.emit('add')
+        self.emit('param')
+        
+        self.emit(f'store')
+        
+        self.ax -= 1
     else:
       raise Exception("IDK!!!")
   
@@ -274,7 +348,6 @@ class CodeGen:
       self.gen_lvalue(node.lhs)
       self.gen_expr(node.rhs)
       self.emit('store')
-      
       self.ax -= 2
     elif node.op == ">" or node.op == "<" or node.op == ">=" or node.op == "<=":
       lbl_end = self.label()
@@ -326,4 +399,5 @@ def type_sizeof(var_type):
   elif isinstance(var_type, TypePointer):
     return 4
   else:
+    print(var_type)
     raise Exception("I DONT KNOW THIS ONE!!!")
