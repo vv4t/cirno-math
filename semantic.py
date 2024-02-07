@@ -174,7 +174,10 @@ def ast_access(scope, node):
   if not member:
     raise SemanticError(node, f"'{node.base.var_type}' has no attribute '{node.name.text}'")
   
-  node.var_type = member.var_type
+  if isinstance(member.var_type, TypeArray):
+    node = AstUnaryOp('&', node, var_type=TypePointer(member.var_type.base))
+  else:
+    node.var_type = member.var_type
   
   return node
 

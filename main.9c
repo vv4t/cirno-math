@@ -1,31 +1,17 @@
 
-class vec2 {
-  int x;
-  int y;
+fn test(int[3] a) {
+  a[0] = 999;
+  a[1] = 2394;
+  a[2] = 4912;
 }
 
-fn add(vec2 a, vec2 b) : vec2 {
-  vec2 c;
-  c.x = a.x + b.x;
-  c.y = a.y + b.y;
-  return c;
+class bike_t {
+  int[3] wheel;
 }
 
-fn sub(vec2 a, vec2 b) : vec2 {
-  vec2 c;
-  c.x = a.x - b.x;
-  c.y = a.y - b.y;
-  return c;
+bike_t bike;
+test(bike.wheel);
+
+for (int i = 0; i < 3; i += 1) {
+  print bike.wheel[i];
 }
-
-vec2 z;
-z.x = 111;
-z.y = 222;
-
-vec2 w;
-w.x = 333;
-w.y = 444;
-
-vec2 u = sub(z, w);
-print u.x;
-print u.y;
