@@ -1,17 +1,20 @@
-
-fn test(int[3] a) {
-  a[0] = 999;
-  a[1] = 2394;
-  a[2] = 4912;
+class vec2 {
+  int x;
+  int y;
+  
+  fn init(int x, int y) {
+    this->x = x;
+    this->y = y;
+  }
+  
+  fn echo() {
+    print this->x;
+    print this->y;
+  }
 }
 
-class bike_t {
-  int[3] wheel;
-}
-
-bike_t bike;
-test(bike.wheel);
-
-for (int i = 0; i < 3; i += 1) {
-  print bike.wheel[i];
-}
+vec2 v;
+v.init(2, 2);
+v.echo();
+vec2* w = &v;
+w->echo();

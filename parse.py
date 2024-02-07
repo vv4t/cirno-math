@@ -47,9 +47,10 @@ class Parse:
     
     self.lex.expect("{")
     members = self.parse_member_list()
+    methods = self.parse_method_list()
     self.lex.expect("}")
     
-    self.class_types[name.text] = AstClass(name, members)
+    self.class_types[name.text] = AstClass(name, members, methods)
     
     return self.class_types[name.text]
 
@@ -63,6 +64,17 @@ class Parse:
       member = self.parse_member()
     
     return members
+  
+  def parse_method_list(self):
+    methods = []
+    
+    method = self.parse_function()
+    
+    while method:
+      methods.append(method)
+      method = self.parse_function()
+    
+    return methods
         
   def parse_member(self):
     var_type = self.parse_var_type()

@@ -148,15 +148,18 @@ class AstVar:
       return f'{self.var_type} {self.name}'
 
 class AstClass:
-  def __init__(self, name, members, scope=None, size=0):
+  def __init__(self, name, members, methods, scope=None, size=0):
     self.name = name
     self.members = members
+    self.methods = methods
     self.scope = scope
     self.size = size
   
   def __repr__(self, pad=0):
-    members = "\n" + " " * (pad + 2) + ("\n" + " " * (pad + 2)).join([ str(member) for member in self.members ]) + "\n"
-    return f'class {self.name} {{{members}}}'
+    str_pad = "\n" + " " * (pad + 2)
+    members = str_pad + ("\n" + " " * (pad + 2)).join(map(str, self.members)) + "\n"
+    methods = str_pad + "\n".join([ method.__repr__(pad=pad+2) for method in self.methods ]) + "\n"
+    return f'class {self.name} {{{members}{methods}}}'
 
 class AstFunc:
   def __init__(self, name, params, var_type, body):
@@ -167,14 +170,14 @@ class AstFunc:
     self.label = None
   
   def __repr__(self, pad=0):
-    return f'fn {self.name}({", ".join(self.args)}) {self.body.__repr__(pad=pad+2)}'
+    return f'fn {self.name}({", ".join(map(str, self.params))}) {self.body.__repr__(pad=pad)}'
 
 class AstPrintStmt:
   def __init__(self, token, body):
     self.token = token
     self.body = body
   
-  def __repr__(self):
+  def __repr__(self, pad=0):
     return ' ' * pad + f'{self.token} {self.body};'
 
 class AstReturnStmt:
@@ -215,8 +218,8 @@ class AstStmt:
   def __init__(self, body):
     self.body = body
   
-  def __repr__(self):
-    return f'{self.body};'
+  def __repr__(self, pad=0):
+    return ' ' * pad + f'{self.body};'
 
 class AstBody:
   def __init__(self, body):
@@ -224,7 +227,7 @@ class AstBody:
     self.scope = Scope(None)
   
   def __repr__(self, pad=0):
-    return '{\n' + '\n'.join([ ' ' * pad + str(stmt) for stmt in self.body ]) + ' ' * pad + '\n}'
+    return '{\n' + '\n'.join([ stmt.__repr__(pad=pad+2) for stmt in self.body ]) + '\n' + ' ' * pad + '}'
 
 class Ast:
   def __init__(self, body):

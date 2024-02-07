@@ -25,6 +25,10 @@ class CodeGen:
     for class_type in node.scope.class_type.values():
       class_type.size = self.var_alloc(class_type.scope, 0)
     
+    for class_type in node.scope.class_type.values():
+      for method in class_type.methods:
+        self.gen_func(method)
+    
     for fn in node.scope.var.values():
       if isinstance(fn, AstFunc):
         self.gen_func(fn)
@@ -253,7 +257,13 @@ class CodeGen:
       raise Exception("IDK THIS")
 
   def gen_call(self, node):
-    fn = self.scope.find(node.base.name)
+    if isinstance(node.base, AstIdentifier):
+      fn = scope.find(node.base.name)
+    elif isinstance(node.base, AstAccess):
+      if node.base.direct:
+        fn = node.base.base.var_type.class_type.scope.find(node.base.name.text)
+      else:
+        fn = node.base.base.var_type.base.class_type.scope.find(node.base.name.text)
     
     if not fn:
       raise Excpetion("CANT FIND FUNCTION!!!!")

@@ -43,6 +43,14 @@ def ast_class(scope, node):
   for member in node.members:
     node.scope.insert(member.name.text, member)
   
+  for method in node.methods:
+    name = Token("Identifier", "this", 0, 0)
+    var_type = TypePointer(TypeSpecifier("class", class_type=node))
+    
+    method.params.insert(0, AstVar(var_type, name, None))
+    
+    ast_func(node.scope, method)
+  
   scope.class_type[node.name.text] = node
   
   return []
@@ -116,7 +124,7 @@ def ast_return_stmt(scope, node):
   return node
 
 def ast_var(scope, node):
-  if scope.find(node.name):
+  if scope.find(node.name.text):
     raise SemanticError(node, f"name '{node.name.text}' has already been declared")
   
   scope.insert(node.name.text, node)
@@ -164,10 +172,10 @@ def ast_access(scope, node):
   
   if isinstance(node.base.var_type, TypePointer):
     if node.direct:
-      raise SemanticError(node, f"indirect request for member '{node.name.text}' from non-pointer.")
+      raise SemanticError(node, f"direct request for member '{node.name.text}' from pointer.")
   else:
     if not node.direct:
-      raise SemanticError(node, f"direct request for member '{node.name.text}' from pointer.")
+      raise SemanticError(node, f"indirect request for member '{node.name.text}' from non-pointer.")
   
   member = base_type.class_type.scope.find(node.name.text)
   
@@ -182,23 +190,45 @@ def ast_access(scope, node):
   return node
 
 def ast_call(scope, node):
-  if not isinstance(node.base, AstIdentifier):
-    raise SemanticError(node, f"cannot call non-function '{node.base}'")
+  node.base = ast_expr(scope, node.base)
   
-  fn = scope.find(node.base.name)
+  if isinstance(node.base, AstIdentifier):
+    fn = scope.find(node.base.name)
+  elif isinstance(node.base, AstAccess):
+    if node.base.direct:
+      if not isinstance(node.base.base.var_type, TypeSpecifier):
+        raise SemanticError(node, f"indirect request for method '{node.base.name}' from non-pointer.")
+      class_type = node.base.base.var_type.class_type
+    else:
+      if not isinstance(node.base.base.var_type, TypePointer):
+        raise SemanticError(node, f"direct request for method '{node.base.name}' from pointer.")
+      
+      class_type = node.base.base.var_type.base.class_type
+    
+    fn = class_type.scope.find(node.base.name.text)
+  else:
+    raise SemanticError(node, f"cannot call non-function '{node.base}'")
   
   if not fn:
     raise SemanticError(node, f"function '{node.base}' is not defined")
   
   fn_str = f"{fn.name}({', '.join([ str(x) for x in fn.params])})"
   
-  if len(node.args) != len(fn.params):
-    raise SemanticError(node, f"'{node}' incorrect number of arguments for '{fn_str}'")
-  
   args = []
+  
+  if isinstance(node.base, AstAccess):
+    if node.base.direct:
+      args.append(ast_expr(scope, AstUnaryOp('&', node.base.base)))
+    else:
+      args.append(ast_expr(scope, node.base.base))
+  
   for arg in node.args:
     args.append(ast_expr(scope, arg))
+  
   node.args = args
+  
+  if len(args) != len(fn.params):
+    raise SemanticError(node, f"'{node}' incorrect number of arguments for '{fn_str}'")
   
   for arg, param in zip(node.args, fn.params):
     if not var_type_cmp(arg.var_type, param.var_type):
