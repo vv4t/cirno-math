@@ -38,17 +38,12 @@ def ast_stmt(scope, node):
     raise Exception("NOT DONE BAKA!!!")
 
 def ast_class(scope, node):
-  node.scope = Scope(None)
+  node.scope = Scope(None, parent_class=node)
   
   for member in node.members:
     node.scope.insert(member.name.text, member)
   
   for method in node.methods:
-    name = Token("Identifier", "this", 0, 0)
-    var_type = TypePointer(TypeSpecifier("class", class_type=node))
-    
-    method.params.insert(0, AstVar(var_type, name, None))
-    
     ast_func(node.scope, method)
   
   scope.class_type[node.name.text] = node
@@ -61,7 +56,7 @@ def ast_func(scope, node):
   
   scope.insert(node.name.text, node)
   
-  new_scope = Scope(scope, ret_type=node.var_type, attach_parent=False)
+  new_scope = Scope(scope, ret_type=node.var_type, attach_parent=False, parent_class=scope.parent_class)
   
   for param in node.params:
     if isinstance(param.var_type, TypeArray):
@@ -146,6 +141,8 @@ def ast_expr(scope, expr):
     return ast_binop(scope, expr)
   elif isinstance(expr, AstUnaryOp):
     return ast_unary_op(scope, expr)
+  elif isinstance(expr, AstThis):
+    return ast_this(scope, expr)
   elif isinstance(expr, AstConstant):
     return ast_constant(scope, expr)
   elif isinstance(expr, AstIdentifier):
@@ -216,12 +213,6 @@ def ast_call(scope, node):
   
   args = []
   
-  if isinstance(node.base, AstAccess):
-    if node.base.direct:
-      args.append(ast_expr(scope, AstUnaryOp('&', node.base.base)))
-    else:
-      args.append(ast_expr(scope, node.base.base))
-  
   for arg in node.args:
     args.append(ast_expr(scope, arg))
   
@@ -270,16 +261,20 @@ def ast_constant(scope, node):
   node.var_type = TypeSpecifier("int")
   return node
 
+def ast_this(scope, node):
+  if not scope.parent_class:
+    raise SemanticError(node, "cannot use 'this' in non-class")
+  
+  node.var_type = TypePointer(TypeSpecifier("class", class_type=scope.parent_class))
+  return node
+
 def ast_identifier(scope, node):
   var = scope.find(node.name)
   
   if not var:
     raise SemanticError(node, f"name '{node.name}' is not defined")
   
-  if isinstance(var.var_type, TypeArray):
-    node = AstUnaryOp('&', node, var_type=TypePointer(var.var_type.base))
-  else:
-    node.var_type = var.var_type
+  node.var_type = var.var_type
   
   return node
 

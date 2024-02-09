@@ -10,20 +10,21 @@ class CodeGen:
     self.ax = 0
     self.gen_body(node.body)
   
-  def var_alloc(self, scope, size):
+  def var_alloc(self, scope):
     for var in scope.var.values():
       if isinstance(var, AstVar):
-        var.loc = size
-        size += type_sizeof(var.var_type)
+        var.loc = scope.size
+        scope.size += type_sizeof(var.var_type)
     
     for child in scope.child:
-      size += self.var_alloc(child, size)
-    
-    return size
+      child.size = scope.size
+      self.var_alloc(child)
+      scope.size = child.size
   
   def gen_body(self, node):
     for class_type in node.scope.class_type.values():
-      class_type.size = self.var_alloc(class_type.scope, 0)
+      self.var_alloc(class_type.scope)
+      class_type.size = class_type.scope.size
     
     for class_type in node.scope.class_type.values():
       for method in class_type.methods:
@@ -34,9 +35,10 @@ class CodeGen:
         self.gen_func(fn)
     
     self.scope = node.scope
-    size = self.var_alloc(self.scope, 0)
+    
+    self.var_alloc(self.scope)
     self.emit_label(self.lbl_main)
-    self.emit(f'frame {size}')
+    self.emit(f'frame {self.scope.size}')
     
     for stmt in node.body:
       self.gen_stmt(stmt)
@@ -44,35 +46,25 @@ class CodeGen:
     self.emit(f'end')
   
   def gen_func(self, fn):
-    size = self.var_alloc(fn.body.scope, 0)
+    self.scope = fn.body.scope
+    
+    self.var_alloc(self.scope)
     
     fn.label = self.label()
     self.lbl_ret = self.label()
-    self.scope = fn.body.scope
+    
+    param_size = 4 if self.scope.parent_class else 0
     
     self.emit_label(fn.label)
-    self.emit(f'frame {size}')
+    self.emit(f'frame {self.scope.size + param_size}')
     
-    loc = 0
-    for param in reversed(fn.params):
-      type_size = type_sizeof(param.var_type)
-      
-      if type_size > 4:
-        n = type_size // 4
-        
-        for i in range(n):
-          self.gen_lvalue(AstIdentifier(param.name.text, token=param.name, var_type=param.var_type))
-          self.emit(f'push {(n - i - 1) * 4}')
-          self.emit('add')
-          self.emit('param')
-          
-          self.emit(f'store')
-          self.ax -= 1
-      else:
-        self.gen_lvalue(AstIdentifier(param.name.text, token=param.name, var_type=param.var_type))
-        self.emit('param')
-        self.emit(f'store')
-        self.ax -= 1
+    for param in fn.params:
+      param_size += type_sizeof(param.var_type)
+    
+    if param_size > 0:
+      self.emit(f'param {param_size}')
+      self.emit('rx $fp')
+      self.emit(f'store {param_size}')
     
     self.gen_compound_stmt(fn.body)
     
@@ -158,23 +150,12 @@ class CodeGen:
   
   def gen_return_stmt(self, node):
     if node.body:
+      type_size = type_sizeof(node.body.var_type)
       self.gen_expr(node.body)
       
-      type_size = type_sizeof(node.body.var_type)
+      self.emit(f'arg {type_size}')
       
-      if type_size > 4:
-        n = type_size // 4
-        
-        for i in range(n):
-          self.emit("rx $sp")
-          self.emit(f"push {(n-i)*4}")
-          self.emit("sub")
-          self.emit("load")
-          self.emit(f"arg")
-          self.ax -= 1
-      else:
-        self.emit(f"arg")
-        self.ax -= 1
+      self.ax -= type_size // 4
     
     self.emit(f'jmp {self.lbl_ret}')
   
@@ -184,11 +165,10 @@ class CodeGen:
   
   def gen_lvalue(self, node):
     if isinstance(node, AstIdentifier):
-      loc = self.scope.find(node.name).loc
+      loc = self.scope.find(node.name).loc + (4 if self.scope.parent_class else 0)
       self.emit(f'push {loc}')
       self.emit(f'rx $fp')
       self.emit(f'add')
-      
       self.ax += 1
     elif isinstance(node, AstIndex):
       self.gen_expr(node.pos)
@@ -196,7 +176,6 @@ class CodeGen:
       self.emit(f'mul')
       self.gen_expr(node.base)
       self.emit(f'add')
-      
       self.ax -= 1
     elif isinstance(node, AstUnaryOp) and node.op == '*':
       self.gen_expr(node.body)
@@ -230,18 +209,26 @@ class CodeGen:
       self.gen_call(node)
     elif isinstance(node, AstIdentifier) or isinstance(node, AstIndex) or isinstance(node, AstAccess):
       self.gen_value(node)
+    elif isinstance(node, AstThis):
+      self.gen_this(node)
     else:
       raise Exception("IDK THIS")
 
+  def gen_this(self, node):
+    if not self.scope.parent_class:
+      raise Exception("NOT CLASS WHY??")
+    
+    self.emit("rx $fp")
+    self.emit("load 4")
+
   def gen_value(self, node):
     type_size = type_sizeof(node.var_type)
-    n = type_size // 4
     
-    for i in range(n):
-      self.gen_lvalue(node)
-      self.emit(f'push {(n - i - 1) * 4}')
-      self.emit('add')
-      self.emit('load')
+    self.gen_lvalue(node)
+    self.emit(f'load {type_size}')
+    
+    self.ax += type_size // 4
+    self.ax -= 1
 
   def gen_unary_op(self, node):
     if node.op == '-':
@@ -258,7 +245,7 @@ class CodeGen:
 
   def gen_call(self, node):
     if isinstance(node.base, AstIdentifier):
-      fn = scope.find(node.base.name)
+      fn = self.scope.find(node.base.name)
     elif isinstance(node.base, AstAccess):
       if node.base.direct:
         fn = node.base.base.var_type.class_type.scope.find(node.base.name.text)
@@ -268,25 +255,47 @@ class CodeGen:
     if not fn:
       raise Excpetion("CANT FIND FUNCTION!!!!")
     
+    mk_tmp = isinstance(node.base, AstAccess) and node.base.direct and not ast_lvalue(node.base.base)   
+    
+    if mk_tmp:
+      self.emit("rx $sp")
+      self.emit("arg 4")
+      self.gen_expr(node.base.base)
+    
+    arg_size = 0
+    
+    if isinstance(node.base, AstAccess):
+      if node.base.direct:
+        if ast_lvalue(node.base.base):
+          self.gen_lvalue(node.base.base)
+        else:
+          self.emit("param 4")
+          self.ax += 1
+      else:
+        self.gen_expr(node.base.base)
+      
+      arg_size += 4
+    
     for arg in node.args:
       self.gen_expr(arg)
-      
-      type_size = type_sizeof(arg.var_type)
-      n = type_size // 4
-      
-      for i in range(n):
-        self.emit('arg')
-        self.ax -= 1
+      arg_size += type_sizeof(arg.var_type)
+    
+    if arg_size > 0:
+      self.emit(f'arg {arg_size}')
+    
+    self.ax -= arg_size // 4
     
     self.emit(f"call {fn.label}")
     
+    if mk_tmp:
+      for i in range(type_sizeof(node.base.base.var_type) // 4):
+        self.emit('pop')
+        self.ax -= 1
+    
     if fn.var_type:
       type_size = type_sizeof(fn.var_type)
-      n = type_size // 4
-      
-      for i in range(n):
-        self.emit(f"param")
-        self.ax += 1
+      self.emit(f"param {type_size}")
+      self.ax += type_size // 4
 
   def gen_constant(self, node):
     self.emit(f'push {node.value}')
@@ -332,32 +341,23 @@ class CodeGen:
   
   def gen_binop_class_class(self, node):
     if node.op == "=":
-      self.gen_expr(node.rhs)
-      
       type_size = type_sizeof(node.var_type)
-      n = type_size // 4
       
-      for i in range(n):
-        self.emit('arg')
-        self.ax -= 1
+      self.gen_expr(node.rhs)
+      self.gen_lvalue(node.lhs)
       
-      for i in range(n):
-        self.gen_lvalue(node.lhs)
-        self.emit(f'push {i*4}')
-        self.emit('add')
-        self.emit('param')
-        
-        self.emit(f'store')
-        
-        self.ax -= 1
+      self.emit(f'store {type_size}')
+      
+      self.ax -= type_size // 4
+      self.ax -= 1
     else:
       raise Exception("IDK!!!")
   
   def gen_binop_int_int(self, node):
     if node.op == "=":
-      self.gen_lvalue(node.lhs)
       self.gen_expr(node.rhs)
-      self.emit('store')
+      self.gen_lvalue(node.lhs)
+      self.emit('store 4')
       self.ax -= 2
     elif node.op == ">" or node.op == "<" or node.op == ">=" or node.op == "<=":
       lbl_end = self.label()

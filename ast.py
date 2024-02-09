@@ -1,14 +1,17 @@
 
 class Scope:
-  def __init__(self, parent, ret_type=None, attach_parent=True):
+  def __init__(self, parent, ret_type=None, attach_parent=True, size=0, parent_class=None):
     self.parent = parent
     self.ret_type = ret_type
     self.child = []
     self.class_type = {}
+    self.parent_class = parent_class
     self.var = {}
+    self.size = size
     
     if self.parent and attach_parent:
       self.ret_type = self.parent.ret_type
+      self.parent_class = self.parent.parent_class
       self.parent.child.append(self)
   
   def insert(self, name, node):
@@ -49,6 +52,14 @@ class TypeArray:
   
   def __repr__(self):
     return f'{self.base}[{self.size}]'
+
+class AstThis:
+  def __init__(self, token, var_type=None):
+    self.token = token
+    self.var_type = var_type
+  
+  def __repr__(self):
+    return self.token.__repr__()
 
 class AstConstant:
   def __init__(self, value, token, var_type=None):
@@ -236,6 +247,15 @@ class Ast:
   def __repr__(self):
     return f'{self.body}'
 
+def ast_lvalue(node):
+  return (
+    isinstance(node, AstIdentifier) or \
+    isinstance(node, AstIndex) or \
+    (isinstance(node, AstUnaryOp) and node.op == '*') or \
+    isinstance(node, AstUnaryOp) and node.op == '*' or \
+    isinstance(node, AstAccess)
+  )
+
 def ast_src(node):
   if isinstance(node, Ast):
     return ast_src(node.body)
@@ -270,6 +290,8 @@ def ast_src(node):
   elif isinstance(node, AstConstant):
     return (node.token.line, node.token.src)
   elif isinstance(node, AstIdentifier):
+    return (node.token.line, node.token.src)
+  elif isinstance(node, AstThis):
     return (node.token.line, node.token.src)
   elif isinstance(node, AstAccess):
     return ast_src(node.base)

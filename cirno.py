@@ -13,7 +13,7 @@ try:
   code_gen = CodeGen(node)
   
   vm = VM(code_gen.code)
-  # vm.dump()
+  vm.dump()
   vm.run()
 except (LexError, SemanticError) as e:
   print(e)

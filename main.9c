@@ -2,9 +2,18 @@ class vec2 {
   int x;
   int y;
   
-  fn init(int x, int y) {
-    this->x = x;
-    this->y = y;
+  fn add(int x, int y) : vec2 {
+    vec2 w;
+    w.x = x + this->x;
+    w.y = y + this->y;
+    return w;
+  }
+  
+  fn mul(int z) : vec2 {
+    vec2 w;
+    w.x = this->x * z;
+    w.y = this->y * z;
+    return w;
   }
   
   fn echo() {
@@ -13,8 +22,11 @@ class vec2 {
   }
 }
 
-vec2 v;
-v.init(2, 2);
-v.echo();
-vec2* w = &v;
-w->echo();
+fn vec2_new(int x, int y) : vec2 {
+  vec2 v;
+  v.x = x;
+  v.y = y;
+  return v;
+}
+
+vec2_new(3, 4).add(3, 4).mul(3).echo();

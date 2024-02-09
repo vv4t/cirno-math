@@ -44,13 +44,14 @@ class Parse:
     name = self.lex.expect("Identifier")
     
     members = []
-    
-    self.lex.expect("{")
-    members = self.parse_member_list()
-    methods = self.parse_method_list()
-    self.lex.expect("}")
+    methods = []
     
     self.class_types[name.text] = AstClass(name, members, methods)
+    
+    self.lex.expect("{")
+    members.extend(self.parse_member_list())
+    methods.extend(self.parse_method_list())
+    self.lex.expect("}")
     
     return self.class_types[name.text]
 
@@ -401,6 +402,10 @@ class Parse:
     if self.lex.match("Identifier"):
       token = self.lex.pop()
       return AstIdentifier(token.text, token)
+    
+    if self.lex.match("this"):
+      token = self.lex.pop()
+      return AstThis(token)
     
     if self.lex.accept("("):
       body = AstExpr(self.parse_expr(), bracket=True)

@@ -3,7 +3,7 @@ class VM:
   def __init__(self, code):
     self.opc = []
     self.lbl = {}
-    self.stack = [0] * 128
+    self.stack = [0] * 16
     self.frame = []
     self.call = []
     self.arg = []
@@ -88,12 +88,16 @@ class VM:
       elif args[0] == "jmp":
         self.pc = self.lbl[args[1]] - 1
       elif args[0] == "load":
+        n = int(args[1]) // 4
         a = self.pop() // 4
-        self.push(self.stack[a])
+        for i in range(n):
+          self.push(self.stack[a + i])
       elif args[0] == "store":
-        b = self.pop()
+        n = int(args[1]) // 4
         a = self.pop() // 4
-        self.stack[a] = b
+        for i in range(n):
+          b = self.pop()
+          self.stack[a + n - i - 1] = b
       elif args[0] == "frame":
         a = int(args[1])
         fp = self.fp
@@ -107,22 +111,27 @@ class VM:
       elif args[0] == "call":
         self.call.append(self.pc)
         self.pc = self.lbl[args[1]] - 1
+        # print(self.arg)
+        # print(' '.join([ (f"[{x}]" if y == self.sp else f"{x}") for x, y in zip(self.stack, range(len(self.stack))) ]))
       elif args[0] == "ret":
         a = self.call.pop()
         self.pc = a
       elif args[0] == "arg":
-        a = self.pop()
-        self.arg.append(a)
+        n = int(args[1]) // 4
+        for i in range(n):
+          self.arg.append(self.pop())
       elif args[0] == "param":
-        self.push(self.arg.pop())
+        n = int(args[1]) // 4
+        for i in range(n):
+          self.push(self.arg.pop())
       elif args[0] == "print":
         b = self.pop()
         print(">", b)
       else:
         print(args[0])
       
-      # info = ' '.join([ (f"[{x}]" if y == self.sp else f"{x}") for x, y in zip(self.stack, range(len(self.stack))) ])
-      # print(' '.join(args), ">")
+      # info = ' '.join([ (f"[{x}]" if y == self.sp // 4 else f"{x}") for x, y in zip(self.stack, range(len(self.stack))) ])
+      # print(self.pc, ' '.join(args), ">", f"$fp={self.fp}")
       # print("  " + info)
       
       self.pc += 1
