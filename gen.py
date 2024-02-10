@@ -264,13 +264,12 @@ class CodeGen:
     
     arg_size = 0
     
-    if isinstance(node.base, AstAccess):
+    if mk_tmp:
+      self.emit("param 4")
+      self.ax += 1
+    elif isinstance(node.base, AstAccess):
       if node.base.direct:
-        if ast_lvalue(node.base.base):
-          self.gen_lvalue(node.base.base)
-        else:
-          self.emit("param 4")
-          self.ax += 1
+        self.gen_lvalue(node.base.base)
       else:
         self.gen_expr(node.base.base)
       
