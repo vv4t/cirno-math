@@ -22,13 +22,9 @@ class CodeGen:
       scope.size = child.size
   
   def gen_body(self, node):
-    for class_type in node.scope.class_type.values():
-      self.var_alloc(class_type.scope)
-      class_type.size = class_type.scope.size
-    
-    for class_type in node.scope.class_type.values():
-      for method in class_type.methods:
-        self.gen_func(method)
+    for struct_type in node.scope.struct_type.values():
+      self.var_alloc(struct_type.scope)
+      struct_type.size = struct_type.scope.size
     
     for fn in node.scope.var.values():
       if isinstance(fn, AstFunc):
@@ -53,7 +49,7 @@ class CodeGen:
     fn.label = self.label()
     self.lbl_ret = self.label()
     
-    param_size = 4 if self.scope.parent_class else 0
+    param_size = 0
     
     self.emit_label(fn.label)
     self.emit(f'frame {self.scope.size + param_size}')
@@ -165,7 +161,7 @@ class CodeGen:
   
   def gen_lvalue(self, node):
     if isinstance(node, AstIdentifier):
-      loc = self.scope.find(node.name).loc + (4 if self.scope.parent_class else 0)
+      loc = self.scope.find(node.name).loc
       self.emit(f'push {loc}')
       self.emit(f'rx $fp')
       self.emit(f'add')
@@ -182,12 +178,12 @@ class CodeGen:
     elif isinstance(node, AstAccess):
       if node.direct:
         self.gen_lvalue(node.base)
-        class_type = node.base.var_type.class_type
+        struct_type = node.base.var_type.struct_type
       else:
         self.gen_expr(node.base)
-        class_type = node.base.var_type.base.class_type
+        struct_type = node.base.var_type.base.struct_type
       
-      member = class_type.scope.find(node.name.text)
+      member = struct_type.scope.find(node.name.text)
       
       self.emit(f'push {member.loc}')
       self.emit(f'add')
@@ -209,17 +205,8 @@ class CodeGen:
       self.gen_call(node)
     elif isinstance(node, AstIdentifier) or isinstance(node, AstIndex) or isinstance(node, AstAccess):
       self.gen_value(node)
-    elif isinstance(node, AstThis):
-      self.gen_this(node)
     else:
       raise Exception("IDK THIS")
-
-  def gen_this(self, node):
-    if not self.scope.parent_class:
-      raise Exception("NOT CLASS WHY??")
-    
-    self.emit("rx $fp")
-    self.emit("load 4")
 
   def gen_value(self, node):
     type_size = type_sizeof(node.var_type)
@@ -246,34 +233,11 @@ class CodeGen:
   def gen_call(self, node):
     if isinstance(node.base, AstIdentifier):
       fn = self.scope.find(node.base.name)
-    elif isinstance(node.base, AstAccess):
-      if node.base.direct:
-        fn = node.base.base.var_type.class_type.scope.find(node.base.name.text)
-      else:
-        fn = node.base.base.var_type.base.class_type.scope.find(node.base.name.text)
     
     if not fn:
       raise Excpetion("CANT FIND FUNCTION!!!!")
     
-    mk_tmp = isinstance(node.base, AstAccess) and node.base.direct and not ast_lvalue(node.base.base)   
-    
-    if mk_tmp:
-      self.emit("rx $sp")
-      self.emit("arg 4")
-      self.gen_expr(node.base.base)
-    
     arg_size = 0
-    
-    if mk_tmp:
-      self.emit("param 4")
-      self.ax += 1
-    elif isinstance(node.base, AstAccess):
-      if node.base.direct:
-        self.gen_lvalue(node.base.base)
-      else:
-        self.gen_expr(node.base.base)
-      
-      arg_size += 4
     
     for arg in node.args:
       self.gen_expr(arg)
@@ -285,11 +249,6 @@ class CodeGen:
     self.ax -= arg_size // 4
     
     self.emit(f"call {fn.label}")
-    
-    if mk_tmp:
-      for i in range(type_sizeof(node.base.base.var_type) // 4):
-        self.emit('pop')
-        self.ax -= 1
     
     if fn.var_type:
       type_size = type_sizeof(fn.var_type)
@@ -332,13 +291,13 @@ class CodeGen:
     elif (
       isinstance(node.lhs.var_type, TypeSpecifier) and
       isinstance(node.rhs.var_type, TypeSpecifier) and
-      node.lhs.var_type.class_type.name == node.rhs.var_type.class_type.name
+      node.lhs.var_type.struct_type.name == node.rhs.var_type.struct_type.name
     ):
-      self.gen_binop_class_class(node)
+      self.gen_binop_struct_struct(node)
     else:
       raise Exception("IDK!!!")
   
-  def gen_binop_class_class(self, node):
+  def gen_binop_struct_struct(self, node):
     if node.op == "=":
       type_size = type_sizeof(node.var_type)
       
@@ -401,8 +360,8 @@ def type_sizeof(var_type):
   if isinstance(var_type, TypeSpecifier):
     if var_type.specifier == "int":
       return 4
-    elif var_type.specifier == "class":
-      return var_type.class_type.size
+    elif var_type.specifier == "struct":
+      return var_type.struct_type.size
   elif isinstance(var_type, TypeArray):
     return var_type.size * type_sizeof(var_type.base)
   elif isinstance(var_type, TypePointer):

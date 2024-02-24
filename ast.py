@@ -1,17 +1,15 @@
 
 class Scope:
-  def __init__(self, parent, ret_type=None, attach_parent=True, size=0, parent_class=None):
+  def __init__(self, parent, ret_type=None, attach_parent=True, size=0):
     self.parent = parent
     self.ret_type = ret_type
     self.child = []
-    self.class_type = {}
-    self.parent_class = parent_class
+    self.struct_type = {}
     self.var = {}
     self.size = size
     
     if self.parent and attach_parent:
       self.ret_type = self.parent.ret_type
-      self.parent_class = self.parent.parent_class
       self.parent.child.append(self)
   
   def insert(self, name, node):
@@ -27,14 +25,14 @@ class Scope:
     return self.var[name]
 
 class TypeSpecifier:
-  def __init__(self, specifier, class_type=None, token=None):
+  def __init__(self, specifier, struct_type=None, token=None):
     self.token = token
     self.specifier = specifier
-    self.class_type = class_type
+    self.struct_type = struct_type
   
   def __repr__(self):
-    if self.specifier == "class":
-      return f'{self.specifier} {self.class_type.name.text}'
+    if self.specifier == "struct":
+      return f'{self.specifier} {self.struct_type.name.text}'
     else:
       return f'{self.specifier}'
 
@@ -52,14 +50,6 @@ class TypeArray:
   
   def __repr__(self):
     return f'{self.base}[{self.size}]'
-
-class AstThis:
-  def __init__(self, token, var_type=None):
-    self.token = token
-    self.var_type = var_type
-  
-  def __repr__(self):
-    return self.token.__repr__()
 
 class AstConstant:
   def __init__(self, value, token, var_type=None):
@@ -158,19 +148,17 @@ class AstVar:
     else:
       return f'{self.var_type} {self.name}'
 
-class AstClass:
-  def __init__(self, name, members, methods, scope=None, size=0):
+class AstStruct:
+  def __init__(self, name, members, scope=None, size=0):
     self.name = name
     self.members = members
-    self.methods = methods
     self.scope = scope
     self.size = size
   
   def __repr__(self, pad=0):
     str_pad = "\n" + " " * (pad + 2)
     members = str_pad + ("\n" + " " * (pad + 2)).join(map(str, self.members)) + "\n"
-    methods = str_pad + "\n".join([ method.__repr__(pad=pad+2) for method in self.methods ]) + "\n"
-    return f'class {self.name} {{{members}{methods}}}'
+    return f'struct {self.name} {{{members}}}'
 
 class AstFunc:
   def __init__(self, name, params, var_type, body):
@@ -269,6 +257,8 @@ def ast_src(node):
     return (node.token.line, node.token.src)
   elif isinstance(node, AstReturnStmt):
     return (node.token.line, node.token.src)
+  elif isinstance(node, AstStruct):
+    return (node.name.line, node.name.src)
   
   if isinstance(node, AstVar):
     return ast_src(node.var_type)
@@ -290,8 +280,6 @@ def ast_src(node):
   elif isinstance(node, AstConstant):
     return (node.token.line, node.token.src)
   elif isinstance(node, AstIdentifier):
-    return (node.token.line, node.token.src)
-  elif isinstance(node, AstThis):
     return (node.token.line, node.token.src)
   elif isinstance(node, AstAccess):
     return ast_src(node.base)

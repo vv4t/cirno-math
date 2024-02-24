@@ -5,7 +5,7 @@ from lex import LexError
 class Parse:
   def __init__(self, lex):
     self.lex = lex
-    self.class_types = {}
+    self.struct_types = {}
   
   def parse(self):
     body = self.parse_body()
@@ -19,7 +19,7 @@ class Parse:
     stmt = find_match([
       lambda : self.parse_stmt(),
       lambda : self.parse_function(),
-      lambda : self.parse_class()
+      lambda : self.parse_struct()
     ])
     
     if not stmt:
@@ -32,28 +32,27 @@ class Parse:
       stmt = find_match([
         lambda : self.parse_stmt(),
         lambda : self.parse_function(),
-        lambda : self.parse_class()
+        lambda : self.parse_struct()
       ])
     
     return AstBody(body)
 
-  def parse_class(self):
-    if not self.lex.accept("class"):
+  def parse_struct(self):
+    if not self.lex.accept("struct"):
       return None
     
     name = self.lex.expect("Identifier")
     
     members = []
-    methods = []
     
-    self.class_types[name.text] = AstClass(name, members, methods)
+    self.struct_types[name.text] = AstStruct(name, members)
     
     self.lex.expect("{")
     members.extend(self.parse_member_list())
-    methods.extend(self.parse_method_list())
     self.lex.expect("}")
+    self.lex.expect(";")
     
-    return self.class_types[name.text]
+    return self.struct_types[name.text]
 
   def parse_member_list(self):
     members = []
@@ -66,17 +65,6 @@ class Parse:
     
     return members
   
-  def parse_method_list(self):
-    methods = []
-    
-    method = self.parse_function()
-    
-    while method:
-      methods.append(method)
-      method = self.parse_function()
-    
-    return methods
-        
   def parse_member(self):
     var_type = self.parse_var_type()
     
@@ -278,15 +266,15 @@ class Parse:
       lambda : self.lex.accept("int")
     ])
     
+    var_type = None
+    
     if specifier:
       var_type = TypeSpecifier(specifier.text, token=specifier)
-    elif self.lex.match("Identifier"):
-      if self.lex.token.text in self.class_types:
-        token = self.lex.pop()
-        var_type = TypeSpecifier("class", class_type=self.class_types[token.text], token=token)
-      else:
-        return None
-    else:
+    elif self.lex.match("Identifier") and self.lex.token.text in self.struct_types:
+      token = self.lex.pop()
+      var_type = TypeSpecifier("struct", struct_type=self.struct_types[token.text], token=token)
+    
+    if not var_type:
       return None
     
     while True:
@@ -402,10 +390,6 @@ class Parse:
     if self.lex.match("Identifier"):
       token = self.lex.pop()
       return AstIdentifier(token.text, token)
-    
-    if self.lex.match("this"):
-      token = self.lex.pop()
-      return AstThis(token)
     
     if self.lex.accept("("):
       body = AstExpr(self.parse_expr(), bracket=True)

@@ -1,32 +1,16 @@
-class vec2 {
-  int x;
+struct a_t {
   int y;
-  
-  fn add(int x, int y) : vec2 {
-    vec2 w;
-    w.x = x + this->x;
-    w.y = y + this->y;
-    return w;
-  }
-  
-  fn mul(int z) : vec2 {
-    vec2 w;
-    w.x = this->x * z;
-    w.y = this->y * z;
-    return w;
-  }
-  
-  fn echo() {
-    print this->x;
-    print this->y;
-  }
+  int x;
+};
+
+fn test(a_t *a)
+{
+  a[0].x = 3;
+  a[0].y = 4;
 }
 
-fn vec2_new(int x, int y) : vec2 {
-  vec2 v;
-  v.x = x;
-  v.y = y;
-  return v;
-}
+a_t[4] b;
+test(&b[0]);
 
-vec2_new(3, 4).add(3, 4).mul(3).echo();
+print b[0].x;
+print b[0].y;

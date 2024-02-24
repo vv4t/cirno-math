@@ -27,8 +27,8 @@ def ast_stmt(scope, node):
     return [ast_for_stmt(scope, node)]
   elif isinstance(node, AstFunc):
     return ast_func(scope, node)
-  elif isinstance(node, AstClass):
-    return ast_class(scope, node)
+  elif isinstance(node, AstStruct):
+    return ast_struct(scope, node)
   elif isinstance(node, AstStmt):
     if isinstance(node.body, AstVar):
       return ast_var(scope, node.body)
@@ -37,16 +37,13 @@ def ast_stmt(scope, node):
   else:
     raise Exception("NOT DONE BAKA!!!")
 
-def ast_class(scope, node):
-  node.scope = Scope(None, parent_class=node)
+def ast_struct(scope, node):
+  node.scope = Scope(None)
   
   for member in node.members:
     node.scope.insert(member.name.text, member)
   
-  for method in node.methods:
-    ast_func(node.scope, method)
-  
-  scope.class_type[node.name.text] = node
+  scope.struct_type[node.name.text] = node
   
   return []
 
@@ -56,7 +53,7 @@ def ast_func(scope, node):
   
   scope.insert(node.name.text, node)
   
-  new_scope = Scope(scope, ret_type=node.var_type, attach_parent=False, parent_class=scope.parent_class)
+  new_scope = Scope(scope, ret_type=node.var_type, attach_parent=False)
   
   for param in node.params:
     if isinstance(param.var_type, TypeArray):
@@ -141,8 +138,6 @@ def ast_expr(scope, expr):
     return ast_binop(scope, expr)
   elif isinstance(expr, AstUnaryOp):
     return ast_unary_op(scope, expr)
-  elif isinstance(expr, AstThis):
-    return ast_this(scope, expr)
   elif isinstance(expr, AstConstant):
     return ast_constant(scope, expr)
   elif isinstance(expr, AstIdentifier):
@@ -164,8 +159,8 @@ def ast_access(scope, node):
   if isinstance(base_type, TypePointer):
     base_type = node.base.var_type.base
   
-  if not isinstance(base_type, TypeSpecifier) or base_type.specifier != "class":
-    raise SemanticError(node, f"request for member '{node.name.text}' for something not a class.")
+  if not isinstance(base_type, TypeSpecifier) or base_type.specifier != "struct":
+    raise SemanticError(node, f"request for member '{node.name.text}' for something not a struct.")
   
   if isinstance(node.base.var_type, TypePointer):
     if node.direct:
@@ -174,7 +169,7 @@ def ast_access(scope, node):
     if not node.direct:
       raise SemanticError(node, f"indirect request for member '{node.name.text}' from non-pointer.")
   
-  member = base_type.class_type.scope.find(node.name.text)
+  member = base_type.struct_type.scope.find(node.name.text)
   
   if not member:
     raise SemanticError(node, f"'{node.base.var_type}' has no attribute '{node.name.text}'")
@@ -191,18 +186,6 @@ def ast_call(scope, node):
   
   if isinstance(node.base, AstIdentifier):
     fn = scope.find(node.base.name)
-  elif isinstance(node.base, AstAccess):
-    if node.base.direct:
-      if not isinstance(node.base.base.var_type, TypeSpecifier):
-        raise SemanticError(node, f"indirect request for method '{node.base.name}' from non-pointer.")
-      class_type = node.base.base.var_type.class_type
-    else:
-      if not isinstance(node.base.base.var_type, TypePointer):
-        raise SemanticError(node, f"direct request for method '{node.base.name}' from pointer.")
-      
-      class_type = node.base.base.var_type.base.class_type
-    
-    fn = class_type.scope.find(node.base.name.text)
   else:
     raise SemanticError(node, f"cannot call non-function '{node.base}'")
   
@@ -261,13 +244,6 @@ def ast_constant(scope, node):
   node.var_type = TypeSpecifier("int")
   return node
 
-def ast_this(scope, node):
-  if not scope.parent_class:
-    raise SemanticError(node, "cannot use 'this' in non-class")
-  
-  node.var_type = TypePointer(TypeSpecifier("class", class_type=scope.parent_class))
-  return node
-
 def ast_identifier(scope, node):
   var = scope.find(node.name)
   
@@ -300,7 +276,8 @@ def ast_binop(scope, node):
   elif (
     isinstance(node.lhs.var_type, TypeSpecifier) and
     isinstance(node.rhs.var_type, TypeSpecifier) and
-    node.lhs.var_type.class_type.name == node.rhs.var_type.class_type.name
+    node.lhs.var_type.specifier == "struct" and node.rhs.var_type.specifier == "struct" and
+    node.lhs.var_type.struct_type.name == node.rhs.var_type.struct_type.name
   ):
     node.var_type = node.lhs.var_type
   else:
@@ -313,10 +290,11 @@ def var_type_cmp(a, b):
     return False
   elif isinstance(a, TypeSpecifier):
     if a.specifier == b.specifier:
-      if a.specifier == "class":
-        return a.class_type.name.text == b.class_type.name.text
-      else:
-        return True
+      if a.specifier == "struct":
+        return a.struct_type.name.text == b.struct_type.name.text
+      return True
+    else:
+      return False
   elif isinstance(a, TypeArray):
     return var_type_cmp(a.base, b.base) and a.size == b.size
   elif isinstance(a, TypePointer) and isinstance(b, TypePointer):
